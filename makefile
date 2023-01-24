@@ -27,6 +27,10 @@ ifeq ($(THIRD_PARTY),)
   Z3_INCLUDE = $(Z3_BIN)../include/
 endif
 
+ifdef __MAC__
+  POSTACTION=install_name_tool -change libz3.dylib @executable_path/libz3.dylib $@
+endif
+
 ifdef __NT__
   # link to the import library on Windows
   STDLIBS += $(Z3_BIN)libz3.lib

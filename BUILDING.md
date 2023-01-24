@@ -47,5 +47,6 @@ On macOS:
 
  * `/path/to/idasdk_pro82/bin/plugins/goomba*` -> `/path/to/ida82/ida.app/Contents/MacOS/plugins/`
  * `/path/to/idasdk_pro82/bin/cfg/goomba.cfg` -> `/path/to/ida82/ida.app/Contents/MacOS/cfg/`
- * `/path/to/idasdk_pro82/bin/libz3.*` -> `/path/to/ida82/ida.app/Contents/Frameworks/`
+ * `/path/to/idasdk_pro82/bin/libz3.*` -> `/path/to/ida82/ida.app/Contents/MacOS/`
+ * `/path/to/idasdk_pro82/bin/libz3.*` -> `/path/to/ida82/ida64.app/Contents/MacOS/`
 
