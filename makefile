@@ -21,7 +21,7 @@ ifeq ($(THIRD_PARTY),)
   ifdef __ARM__
     Z3BIN-$(__MAC__) = z3/z3-$(Z3VER)-arm64-osx-11.0/bin/
   else
-    Z3BIN-$(__MAC__) = z3/z3-$(Z3VER)-osx-10.16/
+    Z3BIN-$(__MAC__) = z3/z3-$(Z3VER)-x64-osx-10.16/bin/
   endif
   Z3_BIN = $(Z3BIN-1)
   Z3_INCLUDE = $(Z3_BIN)../include/
