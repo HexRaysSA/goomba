@@ -12,13 +12,13 @@ for example `C:\idasdk_pro82\plugins\goomba`.
 
 2. Download and extract [z3 build for your OS](https://github.com/Z3Prover/z3/releases) into the `z3` subdirectory, for example:
 
-`z3/z3-4.11.2-x64-win`
+`z3/z3-4.12.1-x64-win`
 
  Under it, you should have `bin` and `include` directories
 
  Alternatively, set `Z3_BIN` and `Z3_INCLUDE` to point to the directories elsewhere.
 
-3. If using another `z3` version than 4.11.2, open `makefile` and adjust
+3. If using another `z3` version than 4.12.1, open `makefile` and adjust
 
  * `Z3VER` with the correct version number
  * possibly, `Z3BIN` with the correct glibc version number (on Linux),
