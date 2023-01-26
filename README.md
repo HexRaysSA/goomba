@@ -15,6 +15,10 @@ post](https://hex-rays.com/blog/deobfuscation-with-goomba/).
 - Verifies soundness of simplifications using the z3 SMT solver
 - Simplifies non-linear MBAs with the use of a function fingerprint oracle
 
+## Building
+
+To build gooMBA from source, please refer to the [BUILDING](BUILDING.md) document.
+
 ## Usage
 
 By default, the plugin does not run automatically. You can invoke the plugin
