@@ -4,6 +4,8 @@ project(goomba)
 
 set(CMAKE_CXX_STANDARD 17)
 
+include($ENV{IDASDK}/ida-cmake/common.cmake)
+
 if (DEFINED Z3_DIR)
     set(Z3_DIR ${Z3_DIR} CACHE STRING "Z3 binary package location")
 elseif (DEFINED ENV{Z3_DIR})
@@ -12,11 +14,11 @@ else()
     set(Z3_DIR "${CMAKE_CURRENT_LIST_DIR}/z3" CACHE STRING "Z3 binary package default location")
 endif()
 
-if (NOT EXISTS "${Z3_DIR}/bin/libz3${CMAKE_STATIC_LIBRARY_SUFFIX}" OR NOT EXISTS "${Z3_DIR}/include/z3++.h")
-    message(FATAL_ERROR "Z3_DIR not defined or the required files are not present or properly configured. Please pass -DZ3_DIR=/path/to/z3-package or specify the Z3_DIR environment variable where both '<Z3_DIR>/lib/libz3${CMAKE_STATIC_LIBRARY_SUFFIX}' and '<Z3_DIR>/include/z3++.h' are present.")
+if (NOT EXISTS "${Z3_DIR}/bin/libz3.${IDALIBSUFFIX}" OR NOT EXISTS "${Z3_DIR}/include/z3++.h")
+    message(FATAL_ERROR "Z3_DIR not defined or the required files are not present or properly configured. Please pass -DZ3_DIR=/path/to/z3-package or specify the Z3_DIR environment variable where both '<Z3_DIR>/bin/libz3.${IDALIBSUFFIX}' and '<Z3_DIR>/include/z3++.h' are present.")
 endif()
 
-set(PLUGIN_LINK_LIBRARIES      ${Z3_DIR}/bin/libz3${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(PLUGIN_LINK_LIBRARIES      ${Z3_DIR}/bin/libz3.${IDALIBSUFFIX})
 set(PLUGIN_INCLUDE_DIRECTORIES ${Z3_DIR}/include)
 
 set(PLUGIN_NAME              goomba)
@@ -40,3 +42,4 @@ if (DEFINED EA64)
 endif()
 
 include($ENV{IDASDK}/ida-cmake/addons.cmake)
+
