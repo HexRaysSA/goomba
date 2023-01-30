@@ -15,15 +15,8 @@ include ../plugin.mak
 
 ifeq ($(THIRD_PARTY),)
   # building outside of Hex-Rays tree, use a local z3 build 
-  Z3BIN-$(__LINUX__) = z3/bin/
-  Z3BIN-$(__NT__)    = z3/bin/
-  ifdef __ARM__
-    Z3BIN-$(__MAC__) = z3/bin/
-  else
-    Z3BIN-$(__MAC__) = z3/bin/
-  endif
-  Z3_BIN = $(Z3BIN-1)
-  Z3_INCLUDE = $(Z3_BIN)../include/
+  Z3_BIN = z3/bin/
+  Z3_INCLUDE = z3/include/
 endif
 
 ifdef __MAC__

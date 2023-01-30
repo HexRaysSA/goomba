@@ -10,11 +10,14 @@ gooMBA requires IDA SDK (8.2 or later) and the [z3 library](https://github.com/Z
 1. After unpacking and setting up the SDK, copy goomba source tree under SDK's `plugins` directory, 
 for example `C:\idasdk_pro82\plugins\goomba`.
 
-2. Download and extract [z3 build for your OS](https://github.com/Z3Prover/z3/releases) into the `z3` subdirectory:
+2. Download and extract [z3 build for your OS](https://github.com/Z3Prover/z3/releases) into the `z3` subdirectory.
 
- Under it, you should have `bin` and `include` directories.
+Under it, you should have `bin` and `include` directories:
 
- Alternatively, set `Z3_BIN` and `Z3_INCLUDE` to point to the directories elsewhere.
+    z3/bin/
+    z3/include/
+
+Alternatively, set `Z3_BIN` and `Z3_INCLUDE` to point to the directories elsewhere.
 
 3. build the necessary version of gooMBA, for example:
 
@@ -29,7 +32,7 @@ On Windows:
  * `C:\idasdk_pro82\bin\cfg\goomba.cfg` -> `C:\Program Files\IDA Pro 8.2\cfg\`
  * `C:\idasdk_pro82\bin\libz3.*` -> `C:\Program Files\IDA Pro 8.2\`
 
-On linux: 
+On linux:
 
  * `/path/to/idasdk_pro82/bin/plugins/goomba*` -> `/path/to/ida82/plugins/`
  * `/path/to/idasdk_pro82/bin/cfg/goomba.cfg` -> `/path/to/ida82/cfg/`

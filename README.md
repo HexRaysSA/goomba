@@ -29,8 +29,8 @@ to be invoked from the right-click menu.
 
 ## Demo
 
-The sample database `tests/idb/mba_challenge.i64` was created from the [`mba_challenge`](https://github.com/mrphrazer/msynth/blob/main/samples/mba_challenge) binary.
-The functions `mba1`, `mba2`, `mba3`, `mba`, `solve_me` contain MBA expressions of varying complexity.
+The sample database `tests/idb/mba_challenge.i64` was created from the `mba_challenge` binary. The functions
+`mba1`, `mba2`, `mba3`, `mba`, `solve_me` contain MBA expressions of varying complexity.
 
 For example, the `mba1` function's initial pseudocode:
 ![mba1 initial pseudocode](./images/mba1_before.png)
