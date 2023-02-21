@@ -5,10 +5,10 @@
  *      gooMBA plugin for Hex-Rays Decompiler.
  *
  */
+
 #include <chrono>
 
 #include "z3++_no_warn.h"
-
 #include "optimizer.hpp"
 
 //--------------------------------------------------------------------------
@@ -26,7 +26,11 @@ inline void set_cmt(ea_t ea, const char *cmt)
 }
 
 //--------------------------------------------------------------------------
-bool check_and_substitute(minsn_t *insn, minsn_t *cand_insn, uint z3_timeout, bool z3_assume_timeouts_correct)
+static bool check_and_substitute(
+        minsn_t *insn,
+        minsn_t *cand_insn,
+        uint z3_timeout,
+        bool z3_assume_timeouts_correct)
 {
   bool ok = false;
   int original_score = score_complexity(*insn);
@@ -103,7 +107,6 @@ bool optimizer_t::optimize_insn(minsn_t *insn)
 {
   bool success = false;
   auto start_time = std::chrono::high_resolution_clock::now();
-  minsn_set_t candidate_set; // recall minsn_set_t is automatically sorted by complexity
 
   if ( insn->has_side_effects(true) )
   {
@@ -117,6 +120,7 @@ bool optimizer_t::optimize_insn(minsn_t *insn)
 
       try
       {
+        minsn_set_t candidate_set; // recall minsn_set_t is automatically sorted by complexity
         auto equiv_class_start = std::chrono::high_resolution_clock::now();
         if ( equiv_classes != nullptr )
           equiv_classes->find_candidates(candidate_set, *insn);
@@ -137,6 +141,7 @@ bool optimizer_t::optimize_insn(minsn_t *insn)
 
         for ( minsn_t *cand : candidate_set )
         {
+          cand->optimize_solo(); // get rid of useless mov(#0) operands
           if ( check_and_substitute(insn, cand, z3_timeout, z3_assume_timeouts_correct) )
           {
             if ( qgetenv("VD_MBA_LOG_PERF") )

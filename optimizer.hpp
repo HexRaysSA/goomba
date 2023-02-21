@@ -21,8 +21,6 @@ inline void substitute(minsn_t *insn, minsn_t *cand)
   insn->swap(*cand);
 }
 
-bool check_and_substitute(minsn_t *insn, const candidate_expr_t &cand);
-
 //--------------------------------------------------------------------------
 class optimizer_t
 {
