@@ -238,6 +238,8 @@ public:
   //-------------------------------------------------------------------------
   mcode_val_t mop_value(const mop_t &mop)
   {
+    if ( mop.size > 8 )
+      throw "too big mop size in mcode emulator";
     switch ( mop.t )
     {
       case mop_n:

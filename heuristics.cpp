@@ -73,6 +73,9 @@ bool is_mba(const minsn_t &insn)
   if ( is_mcode_xdsu(insn.opcode) )
     return false; // exclude xdsu, it is better to optimize its operand
 
+  if ( insn.d.size > 8 )
+    return false; // we only support 64-bit math
+
   mba_opc_counter_t cntr;
   return CONST_CAST(minsn_t*)(&insn)->for_all_insns(cntr) != 0;
 }

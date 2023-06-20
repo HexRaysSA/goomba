@@ -223,11 +223,11 @@ plugin_ctx_t::plugin_ctx_t() : ah(this)
   install_hexrays_callback(callback, this);
   register_action(ACTION_DESC_LITERAL_PLUGMOD(
                     ACTION_NAME,
-                    "Run gooMBA Optimizer",
+                    "De-obfuscate arithmetic expressions",
                     &ah,
                     this,
                     nullptr,
-                    nullptr,
+                    "Attempt to simplify Mixed Boolean Arithmetic-obfuscated expressions using gooMBA",
                     -1));
 }
 
