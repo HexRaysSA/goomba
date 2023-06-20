@@ -50,3 +50,9 @@ in `goomba.cfg` (parameter `MBA_ORACLE_PATH`).
 A large pre-computed oracle is available [here](https://hex-rays.com/products/ida/support/freefiles/goomba-oracle.7z)
 
 NOTE: oracle files generated with IDA 8.2 can only be used with 64-bit binaries, otherwise you may hit internal error 30661.
+
+## Obtaining gooMBA
+
+Please see the [releases](https://github.com/HexRaysSA/goomba/releases) section for `goomba` builds that will work with IDA Pro & IDA Teams v8.2.
+
+Starting with version 8.3, `goomba` is shipped with IDA Pro & IDA Teams.
