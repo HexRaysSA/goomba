@@ -1,7 +1,7 @@
 
-# Bulding gooMBA
+# Building gooMBA
 
-## dependencies
+## Dependencies
 
 gooMBA requires IDA SDK (8.2 or later) and the [z3 library](https://github.com/Z3Prover/z3).
 
@@ -19,7 +19,7 @@ Under it, you should have `bin` and `include` directories:
 
 Alternatively, set `Z3_BIN` and `Z3_INCLUDE` to point to the directories elsewhere.
 
-3. build the necessary version of gooMBA, for example:
+3. Build the necessary version of gooMBA, for example:
 
 ```make -j```  for 32-bit IDA
 ```make __EA64__=1 -j```  for IDA64
