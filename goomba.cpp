@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -28,16 +28,18 @@ inline bool always_on(void)
 }
 
 //--------------------------------------------------------------------------
-struct action_handler : public action_handler_t
+struct run_ah_t : public action_handler_t
 {
   plugin_ctx_t *plugmod;
 
-  action_handler(plugin_ctx_t *_plugmod) : plugmod(_plugmod) {}
+  run_ah_t(plugin_ctx_t *_plugmod) : plugmod(_plugmod) {}
 
   virtual int idaapi activate(action_activation_ctx_t *ctx) override;
-  virtual action_state_t idaapi update(action_update_ctx_t *) override
+  virtual action_state_t idaapi update(action_update_ctx_t *ctx) override
   {
-    return AST_ENABLE;
+    return ctx->widget_type == BWN_PSEUDOCODE
+         ? AST_ENABLE_FOR_WIDGET
+         : AST_DISABLE_FOR_WIDGET;
   };
 };
 
@@ -48,13 +50,45 @@ struct plugin_ctx_t : public plugmod_t
   bool run_automatically = false;
   qstring oracle_path;
 
-  action_handler ah;
+  run_ah_t run_ah;
   optimizer_t optimizer;
   bool plugmod_active = false;
   plugin_ctx_t();
   ~plugin_ctx_t() { term_hexrays_plugin(); }
   virtual bool idaapi run(size_t) override;
+  void init_oracle();
 };
+
+//--------------------------------------------------------------------------
+void plugin_ctx_t::init_oracle()
+{
+  const char *idb_path = get_path(PATH_TYPE_IDB);
+  if ( idb_path != nullptr )
+  {
+    char buf[QMAXPATH];
+    set_file_ext(buf, sizeof(buf), idb_path, ".disable_oracle");
+    if ( qfileexist(buf) )
+      return; // do not use the oracle for this file
+  }
+
+  if ( oracle_path.empty() )
+    qgetenv("VD_MBA_ORACLE_PATH", &oracle_path);
+
+  if ( !oracle_path.empty() )
+  {
+    const char *path = oracle_path.c_str();
+    FILE *fin = qfopen(path, "rb");
+    if ( fin != nullptr )
+    {
+      optimizer.equiv_classes = new equiv_class_finder_lazy_t(fin);
+      msg("%s: loaded MBA oracle\n", path);
+    }
+    else
+    {
+      msg("%s: %s\n", path, qstrerror(-1));
+    }
+  }
+}
 
 //--------------------------------------------------------------------------
 static plugmod_t *idaapi init()
@@ -77,24 +111,7 @@ static plugmod_t *idaapi init()
   };
 
   read_config_file("goomba", cfgopts, qnumber(cfgopts), nullptr);
-
-  if ( plugmod->oracle_path.empty() )
-    qgetenv("VD_MBA_ORACLE_PATH", &plugmod->oracle_path);
-
-  if ( !plugmod->oracle_path.empty() )
-  {
-    const char *path = plugmod->oracle_path.c_str();
-    FILE *fin = qfopen(path, "rb");
-    if ( fin != nullptr )
-    {
-      plugmod->optimizer.equiv_classes = new equiv_class_finder_lazy_t(fin);
-      msg("%s: loaded MBA oracle\n", path);
-    }
-    else
-    {
-      msg("%s: %s\n", path, qstrerror(-1));
-    }
-  }
+  plugmod->init_oracle();
 
   qstring ifpath;
   if ( qgetenv("VD_MSYNTH_PATH", &ifpath) )
@@ -137,7 +154,7 @@ static plugmod_t *idaapi init()
 }
 
 //--------------------------------------------------------------------------
-int idaapi action_handler::activate(action_activation_ctx_t *ctx)
+int idaapi run_ah_t::activate(action_activation_ctx_t *ctx)
 {
   vdui_t *vu = get_widget_vdui(ctx->widget);
   if ( vu != nullptr )
@@ -218,13 +235,13 @@ static ssize_t idaapi callback(void *ud, hexrays_event_t event, va_list va)
 }
 
 //--------------------------------------------------------------------------
-plugin_ctx_t::plugin_ctx_t() : ah(this)
+plugin_ctx_t::plugin_ctx_t() : run_ah(this)
 {
   install_hexrays_callback(callback, this);
   register_action(ACTION_DESC_LITERAL_PLUGMOD(
                     ACTION_NAME,
                     "De-obfuscate arithmetic expressions",
-                    &ah,
+                    &run_ah,
                     this,
                     nullptr,
                     "Attempt to simplify Mixed Boolean Arithmetic-obfuscated expressions using gooMBA",

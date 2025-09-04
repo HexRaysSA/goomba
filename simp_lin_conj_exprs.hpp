@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -127,7 +127,7 @@ public:
     auto minsn_template = bw_expr_tbl_t::instance.lookup(mops.size(), bit_trace);
 
     non_conj_term = non_conj_term
-                  + std::make_shared<mt_constant_t>(-a.val) * ~minsn_template;
+                  + std::make_shared<mt_constant_t>(0-a.val) * ~minsn_template;
 
     return reset_eval_trace();
   }

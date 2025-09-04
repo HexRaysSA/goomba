@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -73,7 +73,7 @@ public:
       if ( var_mapping == nullptr )
       {
         // the instruction must be abstract, get the index from the mop itself
-        QASSERT(30706, mop.t == mop_l);
+        QASSERT(30773, mop.t == mop_l);
         return mcode_val_t(tc[mop.l->idx], mop.size);
       }
       return mcode_val_t(tc.at(var_mapping->at(mop)), mop.size);
@@ -159,7 +159,7 @@ public:
   // find candidate minsns that match the fingerprint of the given minsn
   // before being added, these are made concrete -- the abstract mop_l's are
   // replaced by real mops from the input insn
-  void find_candidates(minsn_set_t &dest, const minsn_t &insn);
+  void find_candidates(minsnptrs_t *out, const minsn_t &insn);
 };
 
 //-------------------------------------------------------------------------
@@ -191,7 +191,7 @@ struct equiv_class_idx_t
     index.resize_noinit(idx_sz);
     size_t nbytes = idx_sz * sizeof(equiv_class_idx_entry_t);
     if ( qfread(file, index.begin(), nbytes) != nbytes )
-      INTERR(0);
+      INTERR(30767);
   }
 
   //-------------------------------------------------------------------------
@@ -226,14 +226,14 @@ struct equiv_class_finder_lazy_t : public equiv_class_finder_t
 
     // read in the format version
     if ( qfread(file, &format_version, sizeof(format_version)) != sizeof(format_version) )
-      INTERR(30716);
+      INTERR(30774);
 
     // read and validate the number of the test cases
     uint32 n_tcs;
     if ( qfread(file, &n_tcs, sizeof(n_tcs)) != sizeof(n_tcs) )
-      INTERR(30717);
+      INTERR(30775);
     if ( n_tcs > fsize )
-      INTERR(0);
+      INTERR(30768);
 
     // read in the test cases
     testcases.resize(n_tcs);
@@ -242,7 +242,7 @@ struct equiv_class_finder_lazy_t : public equiv_class_finder_t
       new_tc.resize(CANDIDATE_EXPR_NUMINPUTS);
       for ( uint64 &new_inp : new_tc )
         if ( qfread(file, &new_inp, sizeof(new_inp)) != sizeof(new_inp) )
-          INTERR(30718);
+          INTERR(30776);
     }
 
     // read in the index
@@ -271,7 +271,7 @@ struct equiv_class_finder_lazy_t : public equiv_class_finder_t
     if ( qfread(file, &n_minsns, sizeof(n_minsns)) != sizeof(n_minsns) )
       INTERR(30723);
     if ( n_minsns > fsize ) // sanity check
-      INTERR(0);
+      INTERR(30769);
 
     bytevec_t bv;
     minsn_set_t &set = equiv_classes[fp];
@@ -281,7 +281,7 @@ struct equiv_class_finder_lazy_t : public equiv_class_finder_t
       if ( qfread(file, &minsn_sz, sizeof(minsn_sz)) != sizeof(minsn_sz) )
         INTERR(30724);
       if ( minsn_sz > fsize ) // sanity check
-        INTERR(0);
+        INTERR(30770);
       bv.resize(minsn_sz);
       if ( qfread(file, bv.begin(), minsn_sz) != minsn_sz )
         INTERR(30725);

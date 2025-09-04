@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -210,7 +210,7 @@ struct mcode_val_t
   //-------------------------------------------------------------------------
   mcode_val_t operator-() const
   {
-    return mcode_val_t(-val, size);
+    return mcode_val_t(0-val, size);
   }
 
   //-------------------------------------------------------------------------

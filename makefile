@@ -14,13 +14,15 @@ CONFIGS=goomba.cfg
 include ../plugin.mak
 
 ifeq ($(THIRD_PARTY),)
-  # building outside of Hex-Rays tree, use a local z3 build 
+  # building outside of Hex-Rays tree, use a local z3 build
   Z3_BIN = z3/bin/
   Z3_INCLUDE = z3/include/
 endif
 
 ifdef __MAC__
-  POSTACTION=install_name_tool -change libz3.dylib @executable_path/libz3.dylib $@
+  ifndef __CODE_CHECKER__
+    POSTACTION=install_name_tool -change libz3.dylib @rpath/libz3.dylib $@
+  endif
 endif
 
 ifdef __NT__
@@ -65,8 +67,8 @@ $(F)equiv_class$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp          \
                   bitwise_expr_lookup_tbl.hpp consts.hpp equiv_class.cpp    \
                   equiv_class.hpp heuristics.hpp lin_conj_exprs.hpp         \
                   linear_exprs.hpp mcode_emu.hpp minsn_template.hpp         \
-                  msynth_parser.hpp optimizer.hpp simp_lin_conj_exprs.hpp   \
-                  smt_convert.hpp z3++_no_warn.h
+                  msynth_parser.hpp nonlin_expr.hpp optimizer.hpp           \
+                  simp_lin_conj_exprs.hpp smt_convert.hpp z3++_no_warn.h
 $(F)file$(O)    : $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp $(I)fpro.h  \
                   $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp $(I)ida.hpp     \
                   $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp $(I)lines.hpp      \
@@ -87,8 +89,8 @@ $(F)goomba$(O)  : $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp $(I)err.h   \
                   bitwise_expr_lookup_tbl.hpp consts.hpp equiv_class.hpp    \
                   file.hpp goomba.cpp heuristics.hpp lin_conj_exprs.hpp     \
                   linear_exprs.hpp mcode_emu.hpp minsn_template.hpp         \
-                  msynth_parser.hpp optimizer.hpp simp_lin_conj_exprs.hpp   \
-                  smt_convert.hpp z3++_no_warn.h
+                  msynth_parser.hpp nonlin_expr.hpp optimizer.hpp           \
+                  simp_lin_conj_exprs.hpp smt_convert.hpp z3++_no_warn.h
 $(F)heuristics$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp           \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
@@ -123,8 +125,8 @@ $(F)optimizer$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp            \
                   bitwise_expr_lookup_tbl.hpp consts.hpp equiv_class.hpp    \
                   heuristics.hpp lin_conj_exprs.hpp linear_exprs.hpp        \
                   mcode_emu.hpp minsn_template.hpp msynth_parser.hpp        \
-                  optimizer.cpp optimizer.hpp simp_lin_conj_exprs.hpp       \
-                  smt_convert.hpp z3++_no_warn.h
+                  nonlin_expr.hpp optimizer.cpp optimizer.hpp               \
+                  simp_lin_conj_exprs.hpp smt_convert.hpp z3++_no_warn.h
 $(F)smt_convert$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp          \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \

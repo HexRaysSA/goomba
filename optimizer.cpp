@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -68,7 +68,18 @@ static bool check_and_substitute(
 
         if ( z3_assume_timeouts_correct && res == z3::check_result::unknown )
         {
-          set_cmt(insn->ea, "goomba: z3 proof timed out, simplification assumed correct");
+          bool add_cmt = true;
+#ifdef TESTABLE_BUILD
+          // when running the testable build, do not append comments about z3 timeouts
+          if ( add_cmt )
+          {
+            qstring tmp;
+            if ( qgetenv("IDA_TEST_NAME", &tmp) )
+              add_cmt = false;
+          }
+#endif
+          if ( add_cmt )
+            set_cmt(insn->ea, "goomba: z3 proof timed out, simplification assumed correct");
           ok = true;
         }
       }
@@ -118,30 +129,49 @@ bool optimizer_t::optimize_insn(minsn_t *insn)
     {
       msg("Found MBA instruction %s\n", insn->dstr());
 
+      minsnptrs_t candidates;
       try
       {
-        minsn_set_t candidate_set; // recall minsn_set_t is automatically sorted by complexity
         auto equiv_class_start = std::chrono::high_resolution_clock::now();
         if ( equiv_classes != nullptr )
-          equiv_classes->find_candidates(candidate_set, *insn);
+          equiv_classes->find_candidates(&candidates, *insn); // Find candidates from the oracle file
         auto equiv_class_end = std::chrono::high_resolution_clock::now();
 
+        // Produce one candidate using naive linear guess
         auto linear_start = equiv_class_end;
         linear_expr_t linear_guess(*insn);
 //        msg("Linear guess %s\n", linear_guess.dstr());
-        candidate_set.insert(linear_guess.to_minsn(insn->ea));
+        candidates.push_back(linear_guess.to_minsn(insn->ea));
         auto linear_end = std::chrono::high_resolution_clock::now();
 
+        // Produce one candidate using SiMBA's algorithm
         auto lin_conj_start = linear_end;
-        lin_conj_expr_t lin_conj_guess(*insn);
-        simp_lin_conj_expr_t simp_lin_conj_expr_t(lin_conj_guess);
+        lin_conj_expr_t lin_conj_guess(*insn);      // MBA Solver's simplification
+        simp_lin_conj_expr_t simp_lin_conj_expr_t(lin_conj_guess);      // Simba's simplification
 //        msg("Simplified lin conj guess %s\n", simp_lin_conj_expr_t.dstr());
-        candidate_set.insert(simp_lin_conj_expr_t.to_minsn(insn->ea));
+        candidates.push_back(simp_lin_conj_expr_t.to_minsn(insn->ea));
         auto lin_conj_end = std::chrono::high_resolution_clock::now();
 
-        for ( minsn_t *cand : candidate_set )
+        // Non-linear MBA optimization
+        nonlin_expr_t nonlin_guess(*insn);
+        if ( nonlin_guess.success() )
         {
-          cand->optimize_solo(); // get rid of useless mov(#0) operands
+          minsn_t *nonlin_cand = nonlin_guess.to_minsn(insn->ea);
+          candidates.push_back(nonlin_cand);
+        }
+
+        // Optimize candidates before sorting them by complexity
+        for ( minsn_t *cand : candidates )
+          cand->optimize_solo();
+
+        std::sort(candidates.begin(), candidates.end(), minsn_complexity_cmptr_t());
+//        msg("total %d candidates:\n", candidates.size());
+//        for ( minsn_t *cand : candidates )
+//          msg("  %s:\n", cand->dstr());
+
+        // Verify the candidates. Return the simplest one that passed verification.
+        for ( minsn_t *cand : candidates )
+        {
           if ( check_and_substitute(insn, cand, z3_timeout, z3_assume_timeouts_correct) )
           {
             if ( qgetenv("VD_MBA_LOG_PERF") )
@@ -155,19 +185,20 @@ bool optimizer_t::optimize_insn(minsn_t *insn)
                 std::chrono::duration_cast<std::chrono::microseconds>(lin_conj_end - lin_conj_start).count());
             }
             success = true;
-            goto finish;
+            break;
           }
         }
       }
       catch ( const char *&e )
       {
         msg("err: %s\n", e);
-        return false;
       }
+      // delete all candidates
+      for ( minsn_t *ins : candidates )
+        delete ins;
     }
   }
 
-finish:
   if ( success )
   {
     auto end_time = std::chrono::high_resolution_clock::now();

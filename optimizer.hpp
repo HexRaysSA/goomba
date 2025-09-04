@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -13,6 +13,7 @@
 #include "heuristics.hpp"
 #include "lin_conj_exprs.hpp"
 #include "simp_lin_conj_exprs.hpp"
+#include "nonlin_expr.hpp"
 
 //--------------------------------------------------------------------------
 inline void substitute(minsn_t *insn, minsn_t *cand)

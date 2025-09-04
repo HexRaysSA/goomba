@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -61,7 +61,7 @@ static void create_var_mapping(var_mapping_t &dest, const mopvec_t &mops)
 }
 
 //-------------------------------------------------------------------------
-void equiv_class_finder_t::find_candidates(minsn_set_t &dest, const minsn_t &insn)
+void equiv_class_finder_t::find_candidates(minsnptrs_t *out, const minsn_t &insn)
 {
   std::set<func_fingerprint_t> seen;
   int num_fingerprints = 0; // includes duplicate fingerprints
@@ -93,7 +93,7 @@ void equiv_class_finder_t::find_candidates(minsn_set_t &dest, const minsn_t &ins
         minsn_t *concrete = make_concrete_minsn(insn.ea, *mi, input_mops, insn.d.size);
 
         if ( concrete != nullptr )
-          dest.insert(concrete);
+          out->push_back(concrete);
 
         if ( num_candidates >= EQUIV_CLASS_MAX_CANDIDATES )
           break;
