@@ -58,7 +58,7 @@ public:
 
   //-------------------------------------------------------------------------
   // helper_emu_t evaluates expressions for a given test case and variable mapping
-  struct helper_emu_t : public mcode_emulator_t
+  struct helper_emu_t : public int64_emulator_t
   {
     const testcase_t &tc;
     const var_mapping_t *var_mapping; // maps variables to input index
@@ -68,15 +68,15 @@ public:
     helper_emu_t (const testcase_t &t, const var_mapping_t *vm)
       : tc(t), var_mapping(vm) {}
 
-    virtual mcode_val_t get_var_val(const mop_t &mop) override
+    virtual intval64_t get_mop_value(const mop_t &mop) override
     {
       if ( var_mapping == nullptr )
       {
         // the instruction must be abstract, get the index from the mop itself
         QASSERT(30773, mop.t == mop_l);
-        return mcode_val_t(tc[mop.l->idx], mop.size);
+        return intval64_t(tc[mop.l->idx], mop.size);
       }
-      return mcode_val_t(tc.at(var_mapping->at(mop)), mop.size);
+      return intval64_t(tc.at(var_mapping->at(mop)), mop.size);
     }
   };
 

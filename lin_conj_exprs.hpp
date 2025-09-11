@@ -9,10 +9,9 @@
 #pragma once
 #include <hexrays.hpp>
 #include "linear_exprs.hpp"
-#include "mcode_emu.hpp"
 
-typedef qvector<mcode_val_t> coeff_vector_t;
-typedef qvector<mcode_val_t> eval_trace_t;
+typedef qvector<intval64_t> coeff_vector_t;
+typedef qvector<intval64_t> eval_trace_t;
 const int LIN_CONJ_MAX_VARS = 16;
 
 // represents a linear combination of conjunctions
@@ -65,7 +64,7 @@ public:
   //-------------------------------------------------------------------------
   // each boolean assignment is represented as a uint32, where the nth bit
   // represents the 0/1 value of the corresponding variable
-  void apply_assignment(uint32 assn, std::map<const mop_t, mcode_val_t> &dest)
+  void apply_assignment(uint32 assn, std::map<const mop_t, intval64_t> &dest)
   {
     // recall std::map keeps keys in sorted order
     int curr_idx = 0;
@@ -83,7 +82,7 @@ public:
   // the return value of this function is the corresponding coefficients in
   // the linear combination of conjunctions that would yield the output
   // behavior. The coefficients are ordered based on the same indexing pattern.
-  void compute_coeffs(coeff_vector_t &dest, const qvector<mcode_val_t> &output_vals)
+  void compute_coeffs(coeff_vector_t &dest, const qvector<intval64_t> &output_vals)
   {
     dest = coeff_vector_t();
     dest.reserve(output_vals.size());
@@ -100,7 +99,7 @@ public:
 
     for ( uint32 i = 1; i < output_vals.size(); i++ )
     {
-      mcode_val_t curr_coeff = output_vals[i];
+      intval64_t curr_coeff = output_vals[i];
       for ( uint32 j = 0; j < i; j++ )
       {
         if ( (i & j) == j )
@@ -117,10 +116,10 @@ public:
   }
 
   //-------------------------------------------------------------------------
-  mcode_val_t evaluate(mcode_emulator_t &emu) const override
+  intval64_t evaluate(int64_emulator_t &emu) const override
   {
     minsn_t *minsn = to_minsn(0);
-    mcode_val_t res = emu.minsn_value(*minsn);
+    intval64_t res = emu.minsn_value(*minsn);
     delete minsn;
     return res;
   }
@@ -144,26 +143,28 @@ public:
   lin_conj_expr_t(const minsn_t &insn)
   {
     default_zero_mcode_emu_t emu;
-    mcode_val_t const_term = emu.minsn_value(insn);
+    intval64_t const_term = emu.minsn_value(insn);     // first-time emulation returns the result when setting all inputs as 0
 
     int nvars = emu.assigned_vals.size();
     if ( nvars > LIN_CONJ_MAX_VARS )
       throw "lin_conj_expr_t: too many input variables";
 
-    uint32 max_assignment = 1 << nvars;
+    uint32 max_assignment = 1 << nvars;       // 2^n possible values in the truth table
     // we have already gotten the value for the all-zeroes assignment, which is const_term
     eval_trace.push_back(const_term);
     eval_trace.reserve(max_assignment);
 
+    // Compute signature vectors
     for ( uint32 assn = 1; assn < max_assignment; assn++ )
     {
       apply_assignment(assn, emu.assigned_vals);
-      mcode_val_t output_val = emu.minsn_value(insn);
+      intval64_t output_val = emu.minsn_value(insn);
 
       eval_trace.push_back(output_val);
     }
-
     compute_coeffs(coeffs, eval_trace);
+
+    // Collect all the input operands from the emulator
     mops.reserve(emu.assigned_vals.size());
     for ( const auto &kv : emu.assigned_vals )
       mops.push_back(kv.first);

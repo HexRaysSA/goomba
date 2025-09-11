@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -49,39 +49,39 @@ linear_expr_t::linear_expr_t(const minsn_t &insn) // creates a linear expression
   for ( auto &p : emu.assigned_vals )
   {
     mop_t mop = p.first;
-    p.second = mcode_val_t(1, mop.size);
-    mcode_val_t coeff = emu.minsn_value(insn) - const_term;
+    p.second = intval64_t(1, mop.size);
+    intval64_t coeff = emu.minsn_value(insn) - const_term;
 
     if ( mop.size < const_term.size )
     {
       // check if a sign extension is necessary
-      p.second = mcode_val_t(-1, mop.size);
-      mcode_val_t eval = emu.minsn_value(insn); // eval = const + (-1)*coeff if x was sign extended
+      p.second = intval64_t(-1, mop.size);
+      intval64_t eval = emu.minsn_value(insn); // eval = const + (-1)*coeff if x was sign extended
 
       if ( const_term - eval == coeff )
         sext.insert(mop);
     }
 
     coeffs.insert( { mop, emu.minsn_value(insn) - const_term } );
-    p.second = mcode_val_t(0, mop.size);
+    p.second = intval64_t(0, mop.size);
   }
 }
 
 //-------------------------------------------------------------------------
-mcode_val_t linear_expr_t::evaluate(mcode_emulator_t &emu) const
+intval64_t linear_expr_t::evaluate(int64_emulator_t &emu) const
 {
-  mcode_val_t res = const_term;
+  intval64_t res = const_term;
 
   for ( const auto &term : coeffs )
   {
     const mop_t &mop = term.first;
-    const mcode_val_t &coeff = term.second;
-    mcode_val_t mop_val = emu.get_var_val(mop);
+    const intval64_t &coeff = term.second;
+    intval64_t mop_val = emu.get_mop_value(mop);
 
     // extend the value to 64 bits first
-    uint64 ext_val = sext.count(mop) ? mop_val.signed_val() : mop_val.val;
+    uint64 ext_val = sext.count(mop) ? mop_val.sval() : mop_val.val;
 
-    res = res + coeff * mcode_val_t(ext_val, coeff.size);
+    res = res + coeff * intval64_t(ext_val, coeff.size);
   }
 
   return res;
@@ -90,18 +90,18 @@ mcode_val_t linear_expr_t::evaluate(mcode_emulator_t &emu) const
 //-------------------------------------------------------------------------
 z3::expr linear_expr_t::to_smt(z3_converter_t &cvtr) const
 {
-  z3::expr res = cvtr.mcode_val_to_expr(const_term);
+  z3::expr res = cvtr.intval64_to_expr(const_term);
 
   for ( const auto &term : coeffs )
   {
     const mop_t &mop = term.first;
-    const mcode_val_t &coeff = term.second;
+    const intval64_t &coeff = term.second;
     z3::expr mop_expr = cvtr.mop_to_expr(mop);
 
     z3::expr ext_expr = cvtr.bv_resize_to_len(mop_expr, const_term.size * 8, sext.count(mop) != 0);
 
     res = res
-        + cvtr.mcode_val_to_expr(coeff) * ext_expr;
+        + cvtr.intval64_to_expr(coeff) * ext_expr;
   }
 
   return res;
@@ -119,7 +119,7 @@ minsn_t *linear_expr_t::to_minsn(ea_t ea) const
   for ( const auto &term : coeffs )
   {
     const mop_t &mop = term.first;
-    const mcode_val_t &coeff = term.second;
+    const intval64_t &coeff = term.second;
 
     if ( coeff.val == 0 )
       continue;

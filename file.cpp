@@ -31,6 +31,29 @@ static qstring curtime()
 }
 
 //-------------------------------------------------------------------------
+static bool is_linear(const minsn_t *insn)
+{
+  switch ( insn->opcode )
+  {
+    case m_ldc:     // constant
+      return true;
+    case m_mov:     // variable
+      return !insn->l.is_insn();
+
+    case m_add:
+    case m_sub:
+      return is_linear(insn->l.d) && is_linear(insn->r.d);
+
+    case m_mul:
+      return (insn->l.is_constant() && is_linear(insn->r.d))
+          || (insn->r.is_constant() && is_linear(insn->l.d));
+
+    default:
+      return false;
+  }
+}
+
+//-------------------------------------------------------------------------
 void create_minsns_file(FILE *msynth_in, FILE *minsns_out)
 {
   qstring line;
@@ -58,6 +81,9 @@ void create_minsns_file(FILE *msynth_in, FILE *minsns_out)
 
     msynth_expr_parser_t mep(line.c_str(), default_vars);
     minsn_t *insn = mep.parse_next_expr();
+
+    if ( is_linear(insn) )
+      continue;
 
     bytevec_t bv;
     insn->serialize(&bv);

@@ -7,10 +7,10 @@
  */
 
 #pragma once
-#include "mcode_emu.hpp"
 #include "linear_exprs.hpp"
 
 const uint64 SPECIAL[] = { 0, 1, 0xffffffffffffffff };
+const uint8 SPECIAL8[] = { 0, 1, 0xff };
 const int NUM_SPECIAL = qnumber(SPECIAL);
 const double SPECIAL_PROBABILITY = 0.2; // probability of selecting a special number when sampling
 
@@ -22,28 +22,110 @@ const int MIN_MBA_ARITH_OPS = 1;
 const int NUM_TEST_CASES = 256;
 
 //-------------------------------------------------------------------------
-mcode_val_t gen_rand_mcode_val(int size);
+intval64_t gen_rand_mcode_val(int size);
+uint8 gen_rand_byte();
+
+//-------------------------------------------------------------------------
+// a data structure for storing the values of memory mops as bytes to solve
+// the overlaping problems, e.g,.:
+// mem_op1: [0x1000, 0x1003]
+// mem_op2: [0x1002, 0x1005]
+struct byte_val_map_t
+{
+  std::map<const uval_t, uint8> stk_map;      // stack variable mapping
+  std::map<const uval_t, uint8> glb_map;      // global variable mapping
+  std::map<const uval_t, uint8> local_map;    // local variable mapping
+  std::map<const uval_t, uint8> reg_map;      // register mapping
+
+  std::map<const mop_t, intval64_t> cache;   // save the seen mop->mcode_val pair
+
+  //-------------------------------------------------------------------------
+  // build a mcode_val from a byte qvector
+  intval64_t bv2mcode_val(qvector<uint8> &bv)
+  {
+    uint64 result = 0;
+    for ( uint8 b : bv )
+    {
+      result = (result << 8) | b;
+    }
+
+    return intval64_t(result, bv.size());
+  }
+
+  //-------------------------------------------------------------------------
+  // find the value of the bytes [off, off+size) in map, assemble the result
+  // as a intval64_t. Create random bytes for new values and update the map.
+  intval64_t find_update(uval_t off, size_t size, std::map<const uval_t, uint8> &map)
+  {
+    qvector<uint8> bytes;
+
+    for ( int i = size - 1; i >= 0; --i )
+    {                               // iterate the addresses from high to low, so the most
+      uval_t mem_addr = off + i;    // significant digit is the first element of the expr_vector
+      auto result = map.find(mem_addr);
+      if ( result != map.end() )
+      {
+        bytes.add(result->second);
+      }
+      else
+      {
+        // create a new random byte
+        uint8 rand_byte = gen_rand_byte();
+        bytes.add(rand_byte);
+        map[mem_addr] = rand_byte;
+      }
+    }
+
+    return bv2mcode_val(bytes);
+  }
+
+  //-------------------------------------------------------------------------
+  intval64_t lookup(const mop_t &op)
+  {
+    auto it = cache.find(op);
+    if ( it != cache.end() )
+      return it->second;
+
+    intval64_t result(0, 1);   // initialize intval64_t, size must be at least 1
+    switch ( op.t )
+    {
+      case mop_S:         // stack variable
+        result = find_update(op.s->off, op.size, stk_map);
+        break;
+      case mop_v:         // global variable
+        result = find_update(op.g, op.size, glb_map);
+        break;
+      case mop_l:         // local variable
+        result = find_update(op.l->off, op.size, local_map);
+        break;
+      case mop_r:         // register
+        result = find_update(op.r, op.size, reg_map);
+        break;
+      default:
+        INTERR(30824);
+    }
+
+    cache.insert( { op, result } );
+    return result;
+  }
+};
 
 //-------------------------------------------------------------------------
 // emulates the microcode, assigning random values to unknown variables
 // (but keeping them consistent across executions)
-struct mcode_emu_rand_vals_t : public mcode_emulator_t
+struct mcode_emu_rand_vals_t : public int64_emulator_t
 {
-  std::map<const mop_t, mcode_val_t> assigned_vals;
+  byte_val_map_t var_vals;
 
-  mcode_val_t get_var_val(const mop_t &mop) override
+  intval64_t get_mop_value(const mop_t &mop) override
   {
     // check that the mop is indeed a variable
     mopt_t t = mop.t;
     QASSERT(30672, t == mop_r || t == mop_S || t == mop_v || t == mop_l);
 
-    auto assignment = assigned_vals.find(mop);
-    if ( assignment != assigned_vals.end() )
-      return assignment->second;
-
-    mcode_val_t new_val = gen_rand_mcode_val(mop.size);
-    assigned_vals.insert( { mop, new_val } );
-    return new_val;
+    intval64_t v = var_vals.lookup(mop);
+    // msg("mop: %s, mcode_val: %s\n", mop.dstr(), v.dstr());
+    return v;
   }
 };
 

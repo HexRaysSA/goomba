@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -18,17 +18,32 @@ inline uint64 rand64()
 }
 
 //-------------------------------------------------------------------------
-mcode_val_t gen_rand_mcode_val(int size)
+intval64_t gen_rand_mcode_val(int size)
 {
   if ( rand() > SPECIAL_PROBABILITY * RAND_MAX )
   {
     // select from uniform random distribution
-    return mcode_val_t(rand64(), size);
+    return intval64_t(rand64(), size);
   }
   else
   {
     // select from special cases
-    return mcode_val_t(SPECIAL[rand() % NUM_SPECIAL], size);
+    return intval64_t(SPECIAL[rand() % NUM_SPECIAL], size);
+  }
+}
+
+//-------------------------------------------------------------------------
+uint8 gen_rand_byte()
+{
+  if ( rand() > SPECIAL_PROBABILITY * RAND_MAX )
+  {
+    // select from uniform random distribution
+    return rand() % 256;
+  }
+  else
+  {
+    // select from special cases
+    return SPECIAL8[rand() % NUM_SPECIAL];
   }
 }
 
@@ -73,6 +88,9 @@ bool is_mba(const minsn_t &insn)
   if ( is_mcode_xdsu(insn.opcode) )
     return false; // exclude xdsu, it is better to optimize its operand
 
+  if ( insn.opcode >= m_jcnd )
+    return false; // not supported by int64_emulator_t
+
   if ( insn.d.size > 8 )
     return false; // we only support 64-bit math
 
@@ -87,8 +105,8 @@ bool probably_equivalent(const minsn_t &insn, const candidate_expr_t &expr)
   for ( int i = 0; i < NUM_TEST_CASES; i++ )
   {
     mcode_emu_rand_vals_t emu;
-    mcode_val_t insn_eval = emu.minsn_value(insn);
-    mcode_val_t expr_eval = expr.evaluate(emu);
+    intval64_t insn_eval = emu.minsn_value(insn);
+    intval64_t expr_eval = expr.evaluate(emu);
 
     if ( insn_eval != expr_eval )
       return false;
@@ -104,8 +122,8 @@ bool probably_equivalent(const minsn_t &a, const minsn_t &b)
   for ( int i = 0; i < NUM_TEST_CASES; i++ )
   {
     mcode_emu_rand_vals_t emu;
-    mcode_val_t insn_eval = emu.minsn_value(a);
-    mcode_val_t expr_eval = emu.minsn_value(b);
+    intval64_t insn_eval = emu.minsn_value(a);
+    intval64_t expr_eval = emu.minsn_value(b);
 
     if ( insn_eval != expr_eval )
       return false;

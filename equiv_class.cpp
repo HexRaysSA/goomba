@@ -74,7 +74,7 @@ void equiv_class_finder_t::find_candidates(minsnptrs_t *out, const minsn_t &insn
     create_var_mapping(mapping, input_mops);
 
     func_fingerprint_t fingerprint = compute_fingerprint(insn, &mapping);
-    msg("Computed fingerprint %" FMT_64 "x\n", fingerprint);
+//    msg("goomba: computed fingerprint %" FMT_64 "x\n", fingerprint);
 
     num_fingerprints++;
     if ( num_fingerprints > EQUIV_CLASS_MAX_FINGERPRINTS )
@@ -89,9 +89,8 @@ void equiv_class_finder_t::find_candidates(minsnptrs_t *out, const minsn_t &insn
       for ( const auto &mi : *equiv_class )
       {
         num_candidates++;
-//        msg("Fingerprint matches: %s\n", mi->dstr());
+//        msg("goomba: fingerprint matches: %s\n", mi->dstr());
         minsn_t *concrete = make_concrete_minsn(insn.ea, *mi, input_mops, insn.d.size);
-
         if ( concrete != nullptr )
           out->push_back(concrete);
 

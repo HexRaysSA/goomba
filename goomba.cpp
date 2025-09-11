@@ -53,6 +53,7 @@ struct plugin_ctx_t : public plugmod_t
   run_ah_t run_ah;
   optimizer_t optimizer;
   bool plugmod_active = false;
+  bool inited_oracle = false;
   plugin_ctx_t();
   ~plugin_ctx_t() { term_hexrays_plugin(); }
   virtual bool idaapi run(size_t) override;
@@ -62,6 +63,11 @@ struct plugin_ctx_t : public plugmod_t
 //--------------------------------------------------------------------------
 void plugin_ctx_t::init_oracle()
 {
+  // a guard to initialize the oracle only once
+  if ( inited_oracle )
+    return;
+  inited_oracle = true;
+
   const char *idb_path = get_path(PATH_TYPE_IDB);
   if ( idb_path != nullptr )
   {
@@ -81,7 +87,7 @@ void plugin_ctx_t::init_oracle()
     if ( fin != nullptr )
     {
       optimizer.equiv_classes = new equiv_class_finder_lazy_t(fin);
-      msg("%s: loaded MBA oracle\n", path);
+      msg("%s: loaded MBA oracle for goomba\n", path);
     }
     else
     {
@@ -111,7 +117,6 @@ static plugmod_t *idaapi init()
   };
 
   read_config_file("goomba", cfgopts, qnumber(cfgopts), nullptr);
-  plugmod->init_oracle();
 
   qstring ifpath;
   if ( qgetenv("VD_MSYNTH_PATH", &ifpath) )
@@ -167,6 +172,136 @@ int idaapi run_ah_t::activate(action_activation_ctx_t *ctx)
 }
 
 //--------------------------------------------------------------------------
+// To satisfy our curiosity: find and print overlapping operands
+static void find_and_print_overlapped_operands(mba_t *mba)
+{
+#if 0
+  struct ida_local overlap_finder_t : public minsn_visitor_t
+  {
+    //------------------------------------------------------------
+    static int compare_mops(const mop_t &op1, const mop_t &op2)
+    {
+      int code = compare(op1.t, op2.t);
+      if ( code != 0 )
+        return code;
+      switch ( op1.t )
+      {
+        case mop_S:         // stack variable
+          code = ::lexcompare(op1.s->off, op2.s->off);
+          break;
+        case mop_v:         // global variable
+          code = ::lexcompare(op1.g, op2.g);
+          break;
+        case mop_r:         // register
+          code = compare(op1.r, op2.r);
+          break;
+        case mop_l:
+          code = op1.l->compare(*op2.l);
+          break;
+        default:
+          INTERR(30822);
+      }
+      if ( code != 0 )
+        return code;
+      return compare(op1.size, op2.size);
+    }
+
+    //------------------------------------------------------------
+    // 0-no overlap, 1-op1 includes op2, -1-op2 includes op1, 2-partial overlap
+    static int mops_overlap(const mop_t &op1, const mop_t &op2)
+    {
+      if ( op1.t != op2.t )
+        return 0;
+      uval_t off1, off2;
+      switch ( op1.t )
+      {
+        case mop_r:
+          off1 = op1.r;
+          off2 = op2.r;
+          break;
+        case mop_S:
+          off1 = op1.s->off;
+          off2 = op2.s->off;
+          break;
+        case mop_v:
+          off1 = op1.g;
+          off2 = op2.g;
+          break;
+        case mop_l:
+          if ( op1.l->idx != op2.l->idx )
+            return 0;
+          off1 = op1.l->off;
+          off2 = op2.l->off;
+          break;
+        default:
+          INTERR(30823);
+      }
+      if ( !interval::overlap(off1, op1.size, off2, op2.size) )
+        return 0;
+      if ( interval::includes(off1, op1.size, off2, op2.size) )
+        return 1;
+      if ( interval::includes(off2, op2.size, off1, op1.size) )
+        return -1;
+      return 2;
+    }
+
+    //----------------------------------------------------------------
+    int idaapi visit_minsn() override
+    {
+      struct mop_collector_t : public mop_visitor_t
+      {
+        qvector<mop_t> seen;
+        qstring info;
+
+        int idaapi visit_mop(mop_t *op, const tinfo_t *, bool)
+        {
+          mopt_t t = op->t;
+          if ( t == mop_r || t == mop_S || t == mop_v || t == mop_l )
+          {
+            for ( mop_t &op2 : seen )
+            {
+              int code = compare_mops(*op, op2);
+              if ( code == 0 )
+                return 0; // already seen
+              code = mops_overlap(*op, op2);
+              switch ( code )
+              {
+                case 0:
+                  break;
+                case 1: // *op includes op2
+                  op2 = *op;
+                  return 0;
+                case -1: // op2 includes *op, nothing to do
+                  return 0;
+                case 2: // found overlap
+                  info.sprnt("%s and %s%s", op->dstr(), op2.dstr(), op->t == mop_r ? " REG" : "");
+                  return 1;
+              }
+            }
+            seen.push_back(*op);
+          }
+          return 0;
+        }
+      };
+      mop_collector_t mc;
+      if ( curins->for_all_ops(mc) != 0 )
+      {
+        msg("%s:%a: detected overlap %s: %s\n",
+            qbasename(get_path(PATH_TYPE_IDB)),
+            curins->ea,
+            mc.info.c_str(), curins->dstr());
+      }
+      return 0;
+    }
+  };
+  overlap_finder_t find_overlaps;
+  mba->for_all_topinsns(find_overlaps);
+#else
+  qnotused(mba);
+#endif
+}
+
+//--------------------------------------------------------------------------
 // This callback handles various hexrays events.
 static ssize_t idaapi callback(void *ud, hexrays_event_t event, va_list va)
 {
@@ -192,9 +327,15 @@ static ssize_t idaapi callback(void *ud, hexrays_event_t event, va_list va)
       break;
 
     case hxe_glbopt:
-      if ( plugmod->plugmod_active )
       {
         mba_t *mba = va_arg(va, mba_t *);
+
+        find_and_print_overlapped_operands(mba);
+
+        if ( !plugmod->plugmod_active )
+          return MERR_OK;
+        // read the oracle file if not done yet
+        plugmod->init_oracle();
 
         struct ida_local insn_optimize_t : public minsn_visitor_t
         {
@@ -203,7 +344,7 @@ static ssize_t idaapi callback(void *ud, hexrays_event_t event, va_list va)
           insn_optimize_t ( optimizer_t &o ) : optimizer(o) {}
           int idaapi visit_minsn() override
           {
-//            msg("Optimizing %s\n", curins->dstr());
+            // msg("goomba: optimizing %s\n", curins->dstr());
             if ( optimizer.optimize_insn_recurse(curins) )
             {
               cnt++;
@@ -217,14 +358,15 @@ static ssize_t idaapi callback(void *ud, hexrays_event_t event, va_list va)
         insn_optimize_t visitor(plugmod->optimizer);
         mba->for_all_topinsns(visitor);
 
+        plugmod->plugmod_active = false;
+        mba->clr_mba_flags2(MBA2_PROP_COMPLEX);
         if ( visitor.cnt != 0 )
         {
           mba->verify(true);
-          msg("Completed mba optimization pass, improved %d expressions\n", visitor.cnt);
+          msg("goomba: completed mba optimization pass, improved %d expressions\n", visitor.cnt);
+          return MERR_LOOP; // restart optimization
         }
-        plugmod->plugmod_active = false;
-        mba->clr_mba_flags2(MBA2_PROP_COMPLEX);
-        return MERR_LOOP; // restart optimization
+        return MERR_OK;
       }
       break;
 
