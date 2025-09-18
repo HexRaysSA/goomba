@@ -20,12 +20,12 @@
 class simp_lin_conj_expr_t : public lin_conj_expr_t
 {
   minsn_template_ptr_t non_conj_term = std::make_shared<mt_constant_t>(0ull);
-  qvector<mcode_val_t> range; // sorted lowest to highest
+  qvector<intval64_t> range; // sorted lowest to highest
 
   //-------------------------------------------------------------------------
   void recompute_range()
   {
-    std::set<mcode_val_t> new_range;
+    std::set<intval64_t> new_range;
 
     for ( const auto &mval : eval_trace )
       new_range.insert(mval);
@@ -38,7 +38,7 @@ class simp_lin_conj_expr_t : public lin_conj_expr_t
   //-------------------------------------------------------------------------
   // returns a bitfield where the i'th bit indicates whether the i'th evaluation
   // returns the value of pos
-  uint64 eval_trace_to_bit_trace(const eval_trace_t &src_trace, mcode_val_t pos)
+  uint64 eval_trace_to_bit_trace(const eval_trace_t &src_trace, intval64_t pos)
   {
     QASSERT(30703, src_trace.size() <= 64);
 
@@ -96,7 +96,7 @@ public:
     if ( eval_trace[0].val != 0 )
       return false;
 
-    mcode_val_t a = range[1];
+    intval64_t a = range[1];
 
     uint64 bit_trace = eval_trace_to_bit_trace(eval_trace, a);
     auto minsn_template = bw_expr_tbl_t::instance.lookup(mops.size(), bit_trace);
@@ -117,10 +117,10 @@ public:
     if ( range.size() != 2 )
       return false;
 
-    mcode_val_t a = eval_trace[0];
-    mcode_val_t b = range[0] == a ? range[1] : range[0];
+    intval64_t a = eval_trace[0];
+    intval64_t b = range[0] == a ? range[1] : range[0];
 
-    if ( a * mcode_val_t(2, b.size) != b )
+    if ( a * intval64_t(2, b.size) != b )
       return false;
 
     uint64 bit_trace = eval_trace_to_bit_trace(eval_trace, b);
@@ -142,8 +142,8 @@ public:
     if ( range.size() != 2 )
       return false;
 
-    mcode_val_t a = eval_trace[0];
-    mcode_val_t b = range[0] == a? range[1] : range[0];
+    intval64_t a = eval_trace[0];
+    intval64_t b = range[0] == a? range[1] : range[0];
 
     uint64 bit_trace = eval_trace_to_bit_trace(eval_trace, b);
     auto minsn_template = bw_expr_tbl_t::instance.lookup(mops.size(), bit_trace);
@@ -166,8 +166,8 @@ public:
     if ( eval_trace[0].val != 0ull )
       return false;
 
-    mcode_val_t a = range[1];
-    mcode_val_t b = range[2];
+    intval64_t a = range[1];
+    intval64_t b = range[2];
 
     uint64 a_bit_trace = eval_trace_to_bit_trace(eval_trace, a);
     uint64 b_bit_trace = eval_trace_to_bit_trace(eval_trace, b);
@@ -193,9 +193,9 @@ public:
     if ( eval_trace[0].val != 0ull )
       return false;
 
-    mcode_val_t a = range[1];
-    mcode_val_t b = range[2];
-    mcode_val_t c = range[3];
+    intval64_t a = range[1];
+    intval64_t b = range[2];
+    intval64_t c = range[3];
 
     // make sure that a = b + c
     if ( b == a + c )
@@ -232,9 +232,9 @@ public:
     if ( eval_trace[0].val != 0ull )
       return false;
 
-    mcode_val_t a = range[1];
-    mcode_val_t b = range[2];
-    mcode_val_t c = range[3];
+    intval64_t a = range[1];
+    intval64_t b = range[2];
+    intval64_t c = range[3];
 
     uint64 a_bit_trace = eval_trace_to_bit_trace(eval_trace, a);
     uint64 b_bit_trace = eval_trace_to_bit_trace(eval_trace, b);
@@ -259,7 +259,7 @@ public:
     if ( eval_trace[0].val == 0ull )
       return false;
 
-    mcode_val_t a = eval_trace[0];
+    intval64_t a = eval_trace[0];
 
     non_conj_term = non_conj_term + std::make_shared<mt_constant_t>(a.val);
 

@@ -9,7 +9,7 @@
 #pragma once
 #include <hexrays.hpp>
 
-//#define LDEB      // enable debug print
+#define LDEB      // enable debug print
 
 //--------------------------------------------------------------------------
 inline AS_PRINTF(1, 2) void dmsg(const char *format, ...)
@@ -32,8 +32,8 @@ class nonlin_expr_t : public candidate_expr_t
   mop_t two;
   mop_t minus_one;
 
-  minsn_t *cur_mba;       // copy of the instruction to normalize
-  ea_t cur_ea = BADADDR;  // during recursion: address of the current insn
+  minsn_t *cur_mba = nullptr; // copy of the instruction to normalize
+  ea_t cur_ea = BADADDR;      // during recursion: address of the current insn
   bool ok = false;
 
   // Terminology of MBA
@@ -61,61 +61,51 @@ class nonlin_expr_t : public candidate_expr_t
     factor_t(const mop_t &arg1) : t(VAR), op(arg1) {}
     factor_t(const std::set<mop_t> &arg1, mop_t arg2) : t(AND_EXPR), ops(arg1), op(arg2) {}
 
-    bool is_var() { return t == VAR; }
-    bool is_and_expr() { return t == AND_EXPR; }
+    bool is_var() const { return t == VAR; }
+    bool is_and_expr() const { return t == AND_EXPR; }
 
     //--------------------------------------------------------------------------
     // override < and == operator for using std::map
     bool operator<(const factor_t &right) const
     {
       if ( t == VAR && right.t == VAR )
-      {
         return op < right.op;
-      }
-      else if ( t == AND_EXPR && right.t == AND_EXPR )
-      {
+      if ( t == AND_EXPR && right.t == AND_EXPR )
         return ops < right.ops;
-      }
-      else
-      { // either t == VAR && right.t == AND_EXPR  or  t == AND_EXPR && right.t == VAR
-        return t == VAR;
-      }
+      // either t == VAR && right.t == AND_EXPR  or  t == AND_EXPR && right.t == VAR
+      return t == VAR;
     }
 
     //--------------------------------------------------------------------------
     bool operator==(const factor_t &right) const
     {
       if ( t == VAR && right.t == VAR )
-      {
         return op == right.op;
-      }
-      else if ( t == AND_EXPR && right.t == AND_EXPR )
-      {
+      if ( t == AND_EXPR && right.t == AND_EXPR )
         return ops == right.ops;
-      }
-      else
-      {
-        return false;
-      }
+      return false;
     }
 
     //--------------------------------------------------------------------------
-    const char *dstr() const
+    qstring dstr() const
     {
       if ( t == VAR )
         return op.dstr();
 
       if ( t == AND_EXPR )
       {
+        int i = 0;
         qstring s("AND(");
         for ( const mop_t &elem : ops )
         {
-          s = s + elem.dstr() + ",";
+          if ( ++i > 1 )
+            s.append(',');
+          s.append(elem.dstr());
         }
-        s += ")";
-        return s.c_str();
+        s.append(')');
+        return s;
       }
-      INTERR(0);
+      INTERR(30825);
     }
 
     //--------------------------------------------------------------------------
@@ -173,7 +163,7 @@ class nonlin_expr_t : public candidate_expr_t
         }
         return;
       }
-      INTERR(0);
+      INTERR(30826);
     }
 
     //--------------------------------------------------------------------------
@@ -198,7 +188,7 @@ class nonlin_expr_t : public candidate_expr_t
     }
 
     //--------------------------------------------------------------------------
-    const char *dstr() const
+    qstring print() const
     {
       qstring s;
       s.sprnt("%d*[", coeff);
@@ -220,273 +210,20 @@ class nonlin_expr_t : public candidate_expr_t
     }
   };
 
-  struct rule_t
-  {
-    qvector<term_t> src;
-    mop_t dst;
-  };
-  //DECLARE_TYPE_AS_MOVABLE(rule_t);
-
-  //--------------------------------------------------------------------------
-  // Define the patterns for reversely applying the normalization rules
-  class simp_patterns_t
-  {
-  public:
-    qvector<rule_t> rules;
-
-    //--------------------------------------------------------------------------
-    simp_patterns_t(const std::set<mop_t> &vars, const nonlin_expr_t *nlex)
-    {
-      // build rules for one-variable expression
-      if ( vars.size() == 1 )
-      {
-        mop_t x = *vars.begin();
-        build_1v_rules(x, nlex);
-        return;
-      }
-
-      // build rules for all two-variable combinations in vars
-      qvector<const mop_t*> vars_vec;
-      for ( const auto &e : vars )
-        vars_vec.push_back(&e);
-      for ( int i = 0; i < vars_vec.size(); i++ )
-      {
-        const mop_t &v1 = *vars_vec[i];
-        for ( int j = i+1; j < vars_vec.size(); j++ )
-        {
-          const mop_t &v2 = *vars_vec[j];
-          build_2v_rules(v1, v2, nlex);
-          build_2v_rules(v2, v1, nlex);
-        }
-      }
-    }
-
-    //--------------------------------------------------------------------------
-    // only one rule for 1 variable expression
-    void build_1v_rules(const mop_t &x, const nonlin_expr_t *nlex)
-    {
-      // rule 10: -x - 1 --> not x
-      term_t t1(x, -1);
-      term_t t2(nlex->one, -1);
-      rule_t &rule = rules.push_back();
-      rule.src.push_back(t1);
-      rule.src.push_back(t2);
-
-      minsn_t *dst_ins = nlex->new_minsn(m_bnot, x);
-      rule.dst = insn_to_mop(dst_ins);
-    }
-
-    //--------------------------------------------------------------------------
-    void build_2v_rules(const mop_t &x, const mop_t &y, const nonlin_expr_t *nlex)
-    {
-      {
-        // rule 1: y - (x and y) --> (not x) and y
-        term_t t1(y, 1);
-        term_t t2(nlex->new_minsn(m_and, x, y), -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_and,
-                                    nlex->new_minsn(m_bnot, x),
-                                    y);
-        rule.dst = insn_to_mop(dst_ins);
-      }
-
-      {
-        // rule 2: x - (y and x) --> x and (not y)
-        // already handled by rule 1
-      }
-
-      {
-        // rule 3:
-        // -x + (x and y) - 1 --> (not x) or y
-        term_t t1(x, -1);
-        term_t t2(nlex->new_minsn(m_and, x, y), 1);
-        term_t t3(nlex->one, -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-        rule.src.push_back(t3);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_or,
-                              nlex->new_minsn(m_bnot, x),
-                              y);
-        rule.dst = insn_to_mop(dst_ins);
-      }
-
-      {
-        // rule 4: -y + (x and y) -1 --> x or (not y)
-        // already handled by rule 3
-      }
-
-      {
-        // rule 5: -x - y + (x and y) - 1 --> not (x or y)
-        term_t t1(x, -1);
-        term_t t2(y, -1);
-        term_t t3(nlex->new_minsn(m_and, x, y), 1);
-        term_t t4(nlex->one, -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-        rule.src.push_back(t3);
-        rule.src.push_back(t4);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_bnot,
-                              nlex->new_minsn(m_or, x, y));
-        rule.dst = insn_to_mop(dst_ins);
-      }
-
-      {
-        // rule 6: -x - y + 2*(x and y) - 1 --> not (x xor y)
-        term_t t1(x, -1);
-        term_t t2(y, -1);
-        minsn_t *t3_ins = nlex->new_minsn(m_mul,
-                            nlex->two,
-                            nlex->new_minsn(m_and, x, y));
-        term_t t3(insn_to_mop(t3_ins), 1);
-        term_t t4(nlex->one, -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-        rule.src.push_back(t3);
-        rule.src.push_back(t4);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_bnot,
-                              nlex->new_minsn(m_xor, x, y));
-        rule.dst = insn_to_mop(dst_ins);
-      }
-
-      {
-        // rule 7: - (x and y) - 1 --> not (x and y)
-        term_t t1(nlex->new_minsn(m_and, x, y), -1);
-        term_t t2(nlex->one, -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_bnot,
-                              nlex->new_minsn(m_and, x, y));
-        rule.dst = insn_to_mop(dst_ins);
-      }
-
-      {
-        // rule 8: x + y - 2*(x and y) --> x xor y
-        term_t t1(x, 1);
-        term_t t2(y, 1);
-        minsn_t *t3_ins = nlex->new_minsn(m_mul,
-                            nlex->two,
-                            nlex->new_minsn(m_and, x, y));
-        term_t t3(insn_to_mop(t3_ins), -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-        rule.src.push_back(t3);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_xor, x, y);
-        rule.dst = insn_to_mop(dst_ins);
-      }
-
-      {
-        // rule 9: x + y - (x and y) --> x or y
-        term_t t1(x, 1);
-        term_t t2(y, 1);
-        term_t t3(nlex->new_minsn(m_and, x, y), -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-        rule.src.push_back(t3);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_or, x, y);
-        rule.dst = insn_to_mop(dst_ins);
-      }
-
-      {
-        // rule 10: -x - 1 --> not x
-        term_t t1(x, -1);
-        term_t t2(nlex->one, -1);
-        rule_t &rule = rules.push_back();
-        rule.src.push_back(t1);
-        rule.src.push_back(t2);
-
-        minsn_t *dst_ins = nlex->new_minsn(m_bnot, x);
-        rule.dst = insn_to_mop(dst_ins);
-      }
-    }
-  };
-
   //--------------------------------------------------------------------------
   class normal_mba_t
   {
   public:
     qvector<term_t> terms;    // a normalized mba is a list of terms
-    std::set<mop_t> vars;     // the variables in this mba expression
-    qvector<mop_t> simp_res;
-
-    //--------------------------------------------------------------------------
-    // check the variables in terms and update vars
-    bool update_vars()
-    {
-      vars.clear();
-      for ( const term_t &t : terms )
-      {
-        const product_t &p = t.prod;
-        for ( const auto &elem : p )
-        {
-          factor_t f = elem.first;
-          if ( f.is_var() )
-            vars.insert(f.op);
-          else if ( f.is_and_expr() )
-            vars.insert(f.ops.begin(), f.ops.end());
-          else
-            return false;
-        }
-      }
-      return true;
-    }
-
-    //--------------------------------------------------------------------------
-    // Final simplification by applying the normalization rules reversely
-    // 1. y - (x and y) --> (not x) and y
-    // 2. x - (x and y) --> x and (not y)
-    // 3. -x + (x and y) - 1 --> (not x) or y
-    // 4. -y + (x and y) - 1 --> x or (not y)
-    // 5. -x - y + (x and y) - 1 --> not (x or y)
-    // 6. -x - y + 2*(x and y) - 1 --> not (x xor y)
-    // 7. - (x and y) - 1 --> not (x and y)
-    // 8. x + y - 2*(x and y) --> x xor y
-    // 9. x + y - (x and y) --> x or y
-    // 10. - x - 1 --> not x
-    void final_simplify(const simp_patterns_t &ptns)
-    {
-      for ( const rule_t &r : ptns.rules )
-      {
-        intvec_t matched;
-        for ( size_t i=0; i < terms.size() && matched.size() < r.src.size(); i++ )
-          if ( r.src.has(terms[i]) )            // matched
-            matched.push_back(i);
-
-        if ( matched.size() == r.src.size() )   // this rule has matched
-        {
-          simp_res.push_back(r.dst);
-          for ( ssize_t i=matched.size()-1; i >= 0; i-- )
-            terms.erase(terms.begin()+matched[i]);
-        }
-      }
-    }
 
     //--------------------------------------------------------------------------
     // dump a normal mba expression as terms
     void dump()
     {
-#ifdef LDEB
       for ( const auto &elem : terms )
-        dmsg("%s, ", elem.dstr());
+        dmsg("%s, ", elem.print().c_str());
       dmsg("\n");
-#endif
-  }
-
-
+    }
   };
 
   normal_mba_t nm_mba;
@@ -533,39 +270,12 @@ public:
       simp_nm_mba(nm_mba);
       dmsg("Simplification Result: ");
       nm_mba.dump();
-
-      nm_mba.update_vars();
-      simp_patterns_t ptns(nm_mba.vars, this);
-      nm_mba.final_simplify(ptns);
-      dmsg("Remaining terms after final_simp(): ");
-      nm_mba.dump();
     }
     else
     {
       dmsg("The mba expr is not normal form!\n");
       ok = false;
     }
-
-    // std::set<mop_t> ops;
-    // ok = is_normalized(cur_mba, &ops);
-    // dmsg("Dump all factors in the current MBA: ");
-    // dump(ops);      // all factors in like-terms
-
-    // remove equivalent factors
-    // qvector<mop_t> vc;
-    // for ( const mop_t &e: ops )
-    //   vc.push_back(e);
-    // for ( size_t i = 0; i < vc.size(); i++ )
-    // {
-    //   for ( size_t j = i+1; j < vc.size(); j++ )
-    //     if ( eq_mba_product(vc[i], vc[j]) )
-    //     {
-    //       vc.erase(vc.begin() + j);
-    //       j--;
-    //     }
-    // }
-    // dmsg("Factors after removing equivalent ones: ");
-    // dump(vc);
 
     // ok = false; // disabled non-linear optimization because the tests fail with it
   }
@@ -641,7 +351,11 @@ public:
     cur_ea = ins->ea; // will be used by new_minsn()
     minsn_t *sub;
 
-    if ( parent != nullptr && parent->opcode == m_and && ins->opcode == m_sub && ins->r.signed_value() == 1 )      // (x - 1) --> ~ -x
+    // (x - 1) --> ~ -x
+    if ( parent != nullptr
+      && parent->opcode == m_and
+      && ins->opcode == m_sub
+      && ins->r.is_one() )
     {
       mop_t &x = ins->l;
       // ~ -x
@@ -649,6 +363,47 @@ public:
       ins->swap(*sub);
       delete sub;
     }
+
+    // xdu ( and reg, imm ) --> and new_reg, new_imm
+    if ( parent != nullptr
+      && parent->opcode == m_xdu
+      && ins->opcode == m_and
+      && ins->l.is_reg()
+      && ins->r.is_constant() )
+    {
+      // The size of the destination and source operands of the xdu insn
+      int dst_size = parent->d.size;
+      // int src_size = parent->l.size;
+
+      unsigned int imm = ins->r.unsigned_value();
+
+      // build the operands for the new substitution instruction
+      mop_t new_reg;
+      new_reg.make_reg(ins->l.r, dst_size);
+      mop_t new_imm;
+      new_imm.make_number(imm, dst_size);
+
+      sub = new_minsn(m_and, new_reg, new_imm);
+      parent->swap(*sub);
+      delete sub;
+    }
+
+    // TODO: non-linear simplification works well on two-variable and most three-
+    // variable MBAs, but not work well on MBAs with more than four-variables.
+    // The following code can somehow group the variables together to alleviate the
+    // problem a little bit.
+    //
+    // Group the variables together in an AND expression of multiple variables
+    // swap the mops so that the non-insn mops are grouped to the left child.
+    //
+    // if ( parent != nullptr
+    //   && parent->opcode == m_and
+    //   && ins->opcode == m_and
+    //   && !parent->r.is_insn()
+    //   && ins->r.is_insn() )
+    // {
+    //   parent->r.swap(ins->r);
+    // }
 
   }
 
@@ -688,7 +443,7 @@ public:
       // Rules 1 and 2
       case 2:
         ins->l.swap(ins->r);
-        // no break
+        [[fallthrough]];
       case 1:
         {
           mop_t &x = ins->l.d->l;
@@ -702,7 +457,7 @@ public:
       // Rules 3 and 4
       case 4:
         ins->l.swap(ins->r);
-        // no break
+        [[fallthrough]];
       case 3:
         {
           mop_t &x = ins->l.d->l;
@@ -938,21 +693,29 @@ public:
   }
 
   //--------------------------------------------------------------------------
+  // Check an operand is an MBA factor, i.e., a (negate) variable, or an AND expression
+  // examples: x, -x, x&y, x&(-y), x&(-y&z)
+  static bool is_factor(const mop_t &op)
+  {
+    if ( op.t == mop_S || op.is_reg() )
+      return true;
+    if ( op.is_insn(m_neg) )
+      return is_factor(op.d->l);
+    if ( op.is_insn(m_and) )
+      return is_factor(op.d->l) && is_factor(op.d->r);
+    else
+      return false;
+  }
+
+  //--------------------------------------------------------------------------
   // Check an operand is an MBA product, i.e., the product of a variable with their AND expressions.
   // like: (x&y) * x * (x&y) * y
   static bool is_product(const mop_t &op)
   {
-    if ( op.t == mop_S || op.is_reg() )
+    if ( is_factor(op) )
       return true;
-    if ( op.is_insn() )
-    {
-      if ( op.d->opcode == m_neg || op.d->opcode == m_add || op.d->opcode == m_sub )    // allow minus, add, sub expr as a factor
-        return true;
-      else if ( op.d->opcode == m_mul || op.d->opcode == m_and )
-        return is_product(op.d->l) && is_product(op.d->r);
-      else
-        return false;
-    }
+    if ( op.is_insn(m_mul) )
+      return is_product(op.d->l) && is_product(op.d->r);
     else
       return false;
   }
@@ -962,51 +725,42 @@ public:
   // with/without coefficient.
   // Examples:
   // x, 3*x*y*(x&y)
-  // The optional argument s is a set that collects the non-coefficient parts of a term
-  static bool is_mba_term(const mop_t &op, std::set<mop_t> *s=nullptr)
+  static bool is_mba_term(const mop_t &op)
   {
-    if ( op.is_constant() )                                 // constant term
+    if ( op.is_constant() )     // constant term
       return true;
-    if ( op.t == mop_S || op.is_reg() )                // single variable term
-    {
-      if ( s != nullptr )
-        s->insert(op);
+    if ( op.t == mop_S || op.is_reg() )     // single variable term
       return true;
-    }
-    if ( is_product(op) )                           // no coefficient
-    {
-      if ( s != nullptr )
-        s->insert(op);
+    if ( is_product(op) )     // no coefficient
       return true;
-    }
-    if ( op.is_insn() && op.d->opcode == m_mul )
+    if ( op.is_insn(m_neg) )
     {
       minsn_t *ins = op.d;
-      if ( ins->l.is_constant() && is_product(ins->r) )          // n*(a&b)
-      {
-        if ( s != nullptr )
-          s->insert(ins->r);
+      if ( is_product(ins->l) )     // negate a product like -(x&y*y&z)
         return true;
-      }
+      if ( ins->l.is_constant() )     // negate a constant like -1
+        return true;
+    }
+    if ( op.is_insn(m_mul) )
+    {
+      minsn_t *ins = op.d;
+      if ( ins->l.is_constant() && is_product(ins->r) )     // n*(a&b)
+        return true;
       if ( ins->r.is_constant() && is_product(ins->l) )     // (a&b)*n
-      {
-        if ( s != nullptr )
-          s->insert(ins->l);
         return true;
-      }
     }
     return false;
   }
 
   //--------------------------------------------------------------------------
   // Check if an MBA has been successfully normalized
-  static bool is_normalized(minsn_t *minsn, std::set<mop_t> *s=nullptr)
+  static bool is_normalized(minsn_t *minsn)
   {
     minsn_t *ins = minsn;
     // check every insn node is a left subtree +/- a mba_term
-    while ( ins->l.is_insn() && (ins->l.d->opcode == m_add || ins->l.d->opcode == m_sub) )
+    while ( ins->l.is_insn(m_add) || ins->l.is_insn(m_sub) )
     {
-      if ( (ins->opcode == m_add || ins->opcode == m_sub) && is_mba_term(ins->r, s) )
+      if ( (ins->opcode == m_add || ins->opcode == m_sub) && is_mba_term(ins->r) )
         ins = ins->l.d;
       else
         return false;
@@ -1014,8 +768,8 @@ public:
 
     // Check the left most term
     if ( (ins->opcode == m_add || ins->opcode == m_sub)
-      && is_mba_term(ins->r, s)
-      && is_mba_term(ins->l, s) )
+      && is_mba_term(ins->r)
+      && is_mba_term(ins->l) )
     {
       return true;
     }
@@ -1035,8 +789,7 @@ public:
     }
     if ( op.is_insn() )
     {
-      if ( op.d->opcode == m_neg || op.d->opcode == m_add      // allow minus, add, sub expr as a factor
-        || op.d->opcode == m_sub )
+      if ( op.d->opcode == m_neg )      // allow m_neg in a factor
       {
         op_set->insert(op);
         return true;
@@ -1093,7 +846,7 @@ public:
       if ( build_product(&p1, op1) && build_product(&p2, op2) )
         return p1 == p2;
       dmsg("build_product error!\n");
-      INTERR(0);
+      INTERR(30827);
     }
     return false;
   }
@@ -1101,7 +854,7 @@ public:
   //--------------------------------------------------------------------------
   static bool build_normal_mba(minsn_t *ins, normal_mba_t &nm_mba)
   {
-    while ( ins->l.is_insn() && (ins->l.d->opcode == m_add || ins->l.d->opcode == m_sub) )
+    while ( ins->l.is_insn(m_add) || ins->l.is_insn(m_sub) )
     {
       if ( ins->opcode == m_add )
       {
@@ -1123,22 +876,30 @@ public:
     }
 
     // add the leftmost term and the second leftmost one
-    if ( ins->opcode == m_add )
+    if ( ins->opcode == m_add || ins->opcode == m_sub )
     {
-      term_t new_term_r(ins->r, 1);
-      term_t new_term_l(ins->l, 1);         // TODO: the leftmost coefficient could be negative
-      nm_mba.terms.push_back(new_term_r);
+      int leftmost_sign;
+      mop_t leftmost_node;
+      if ( ins->l.is_insn(m_neg) )      // the leftmost instruction could be negative
+      {
+        leftmost_sign = -1;
+        leftmost_node = ins->l.d->l;
+      }
+      else
+      {
+        leftmost_sign = 1;
+        leftmost_node = ins->l;
+      }
+      term_t new_term_l(leftmost_node, leftmost_sign);
       nm_mba.terms.push_back(new_term_l);
+
+      int right_sign = ins->opcode == m_add ? 1 : -1;
+      term_t new_term_r(ins->r, right_sign);
+      nm_mba.terms.push_back(new_term_r);
+
       return true;
     }
-    else if ( ins->opcode == m_sub )
-    {
-      term_t new_term_r(ins->r, -1);
-      term_t new_term_l(ins->l, 1);
-      nm_mba.terms.push_back(new_term_r);
-      nm_mba.terms.push_back(new_term_l);
-      return true;
-    }
+
     dmsg("build_normal_mba error: unrecognized leftmost term.");
     return false;
   }
@@ -1190,13 +951,9 @@ public:
   // dump the elements in a vector of mop_t
   static void dump(const qvector<mop_t> &ops)
   {
-#ifdef LDEB
     for ( const mop_t &elem : ops )
       dmsg("%s ", elem.dstr());
     dmsg("\n");
-#else
-    qnotused(ops);
-#endif
   }
 
   //--------------------------------------------------------------------------
@@ -1222,19 +979,6 @@ public:
       res = add;
     }
 
-    // generate minsn for the terms simplified by the final_simplify()
-    for ( const mop_t &op : nm_mba.simp_res )
-    {
-      minsn_t *add = new minsn_t(ea);
-      add->opcode = m_add;
-      add->l.t = mop_d;
-      add->l.d = res;
-      add->l.size = size;
-      add->r = op;
-      add->d.size = size;
-      res = add;
-    }
-
     return res;
   }
 
@@ -1248,9 +992,9 @@ public:
   }
 
   //--------------------------------------------------------------------------
-  mcode_val_t evaluate(mcode_emulator_t &emu) const override
+  intval64_t evaluate(int64_emulator_t &emu) const override
   {
-    mcode_val_t res = emu.minsn_value(*cur_mba);
+    intval64_t res = emu.minsn_value(*cur_mba);
     return res;
   }
 

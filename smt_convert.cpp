@@ -1,5 +1,5 @@
 /*
- *      Copyright (c) 2023 by Hex-Rays, support@hex-rays.com
+ *      Copyright (c) 2025 by Hex-Rays, support@hex-rays.com
  *      ALL RIGHTS RESERVED.
  *
  *      gooMBA plugin for Hex-Rays Decompiler.
@@ -14,19 +14,6 @@ z3::expr z3_converter_t::create_new_z3_var(const mop_t &mop)
 {
   const char *name = build_new_varname();
   return context.bv_const(name, mop.size * 8);
-}
-
-//--------------------------------------------------------------------------
-z3::expr z3_converter_t::var_to_expr(const mop_t &mop)
-{
-  if ( assigned_vars.count(mop) )
-    return assigned_vars.at(mop);
-
-  // mop has not yet been assigned a z3 var, make one now
-  z3::expr new_var = create_new_z3_var(mop);
-  input_vars.push_back(new_var);
-  assigned_vars.insert( { mop, new_var } );
-  return new_var;
 }
 
 //--------------------------------------------------------------------------
@@ -48,16 +35,14 @@ z3::expr z3_converter_t::mop_to_expr(const mop_t &mop)
     case mop_S: // stack variable
     case mop_v: // global variable
       {
-        auto p = assigned_vars.find(mop);
-        if ( p != assigned_vars.end() )
-          return p->second;
+        return lookup(mop);
+      }
 
-        // mop has not yet been assigned a z3 var, make one now
-        const char *name = build_new_varname();
-        z3::expr new_var = context.bv_const(name, mop.size * 8);
-        input_vars.push_back(new_var);
-        assigned_vars.insert( { mop, new_var } );
-        return new_var;
+    case mop_p: // operand pair
+      {
+        z3::expr vhi = mop_to_expr(mop.pair->hop);
+        z3::expr vlo = mop_to_expr(mop.pair->lop);
+        return z3::concat(vhi, vlo);
       }
     default:
       INTERR(30696); // it is better to check this before running z3, when detecting mba
@@ -161,6 +146,46 @@ z3::expr z3_converter_t::minsn_to_expr(const minsn_t &insn)
       return bool_to_bv(z3::slt(mop_to_expr(insn.l), mop_to_expr(insn.r)), insn.d.size * 8);
     case m_setle:
       return bool_to_bv(z3::sle(mop_to_expr(insn.l), mop_to_expr(insn.r)), insn.d.size * 8);
+    case m_cfshl: // not tested
+      {
+        auto nbits = insn.l.size * 8;
+        auto x = mop_to_expr(insn.l);
+        auto y = mop_to_expr(insn.r);
+        auto xsize = context.bv_val(nbits, nbits);
+        auto bit = z3::shl(context.bv_val(1, nbits), xsize - y);
+        return bool_to_bv((x & bit) != 0, insn.d.size * 8);
+      }
+    case m_cfshr: // not tested
+      {
+        auto nbits = insn.l.size * 8;
+        auto x = mop_to_expr(insn.l);
+        auto y = mop_to_expr(insn.r);
+        auto one = context.bv_val(1, nbits);
+        auto bit = z3::shl(one, y - one);
+        return bool_to_bv((x & bit) != 0, insn.d.size * 8);
+      }
+    case m_cfadd:
+      {
+        auto nbits = insn.l.size * 8;
+        auto x = mop_to_expr(insn.l);
+        auto y = mop_to_expr(insn.r);
+        auto mone = context.bv_val(-1, nbits);
+        return bool_to_bv(x > mone - y, insn.d.size * 8);
+      }
+    case m_ofadd:
+      {
+        auto x = mop_to_expr(insn.l);
+        auto y = mop_to_expr(insn.r);
+        auto r = x + y;
+        return bool_to_bv(((x ^ r) & (y ^ r)) < 0, insn.d.size * 8);
+      }
+    case m_seto:
+      {
+        auto x = mop_to_expr(insn.l);
+        auto y = mop_to_expr(insn.r);
+        auto r = x - y;
+        return bool_to_bv(((x ^ r) & (y ^ r)) < 0, insn.d.size * 8);
+      }
     default:
       INTERR(30697); // it is better to check this before running z3, when detecting mba
   }

@@ -18,7 +18,7 @@
 //--------------------------------------------------------------------------
 inline void substitute(minsn_t *insn, minsn_t *cand)
 {
-  cand->d = insn->d;
+  cand->d.swap(insn->d);
   insn->swap(*cand);
 }
 

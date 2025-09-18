@@ -56,8 +56,7 @@ $(F)bitwise_expr_lookup_tbl$(O): $(I)bitrange.hpp $(I)bytes.hpp             \
                   $(I)pro.h $(I)range.hpp $(I)segment.hpp $(I)typeinf.hpp   \
                   $(I)ua.hpp $(I)xref.hpp bitwise_expr_lookup_tbl.cpp       \
                   bitwise_expr_lookup_tbl.hpp consts.hpp linear_exprs.hpp   \
-                  mcode_emu.hpp minsn_template.hpp smt_convert.hpp          \
-                  z3++_no_warn.h
+                  minsn_template.hpp smt_convert.hpp z3++_no_warn.h
 $(F)equiv_class$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp          \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
@@ -66,9 +65,9 @@ $(F)equiv_class$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp          \
                   $(I)segment.hpp $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp   \
                   bitwise_expr_lookup_tbl.hpp consts.hpp equiv_class.cpp    \
                   equiv_class.hpp heuristics.hpp lin_conj_exprs.hpp         \
-                  linear_exprs.hpp mcode_emu.hpp minsn_template.hpp         \
-                  msynth_parser.hpp nonlin_expr.hpp optimizer.hpp           \
-                  simp_lin_conj_exprs.hpp smt_convert.hpp z3++_no_warn.h
+                  linear_exprs.hpp minsn_template.hpp msynth_parser.hpp     \
+                  nonlin_expr.hpp optimizer.hpp simp_lin_conj_exprs.hpp     \
+                  smt_convert.hpp z3++_no_warn.h
 $(F)file$(O)    : $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp $(I)fpro.h  \
                   $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp $(I)ida.hpp     \
                   $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp $(I)lines.hpp      \
@@ -77,9 +76,8 @@ $(F)file$(O)    : $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp $(I)fpro.h  \
                   $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp                   \
                   bitwise_expr_lookup_tbl.hpp consts.hpp equiv_class.hpp    \
                   file.cpp file.hpp heuristics.hpp lin_conj_exprs.hpp       \
-                  linear_exprs.hpp mcode_emu.hpp minsn_template.hpp         \
-                  msynth_parser.hpp simp_lin_conj_exprs.hpp                 \
-                  smt_convert.hpp z3++_no_warn.h
+                  linear_exprs.hpp minsn_template.hpp msynth_parser.hpp     \
+                  simp_lin_conj_exprs.hpp smt_convert.hpp z3++_no_warn.h
 $(F)goomba$(O)  : $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp $(I)err.h   \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
@@ -88,9 +86,9 @@ $(F)goomba$(O)  : $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp $(I)err.h   \
                   $(I)segment.hpp $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp   \
                   bitwise_expr_lookup_tbl.hpp consts.hpp equiv_class.hpp    \
                   file.hpp goomba.cpp heuristics.hpp lin_conj_exprs.hpp     \
-                  linear_exprs.hpp mcode_emu.hpp minsn_template.hpp         \
-                  msynth_parser.hpp nonlin_expr.hpp optimizer.hpp           \
-                  simp_lin_conj_exprs.hpp smt_convert.hpp z3++_no_warn.h
+                  linear_exprs.hpp minsn_template.hpp msynth_parser.hpp     \
+                  nonlin_expr.hpp optimizer.hpp simp_lin_conj_exprs.hpp     \
+                  smt_convert.hpp z3++_no_warn.h
 $(F)heuristics$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp           \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
@@ -98,24 +96,24 @@ $(F)heuristics$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp           \
                   $(I)name.hpp $(I)netnode.hpp $(I)pro.h $(I)range.hpp      \
                   $(I)segment.hpp $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp   \
                   heuristics.cpp heuristics.hpp linear_exprs.hpp            \
-                  mcode_emu.hpp smt_convert.hpp z3++_no_warn.h
+                  smt_convert.hpp z3++_no_warn.h
 $(F)linear_exprs$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp         \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
                   $(I)lines.hpp $(I)llong.hpp $(I)loader.hpp $(I)nalt.hpp   \
                   $(I)name.hpp $(I)netnode.hpp $(I)pro.h $(I)range.hpp      \
                   $(I)segment.hpp $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp   \
-                  linear_exprs.cpp linear_exprs.hpp mcode_emu.hpp           \
-                  smt_convert.hpp z3++_no_warn.h
+                  linear_exprs.cpp linear_exprs.hpp smt_convert.hpp         \
+                  z3++_no_warn.h
 $(F)msynth_parser$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp        \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
                   $(I)lines.hpp $(I)llong.hpp $(I)loader.hpp $(I)nalt.hpp   \
                   $(I)name.hpp $(I)netnode.hpp $(I)pro.h $(I)range.hpp      \
                   $(I)segment.hpp $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp   \
-                  consts.hpp linear_exprs.hpp mcode_emu.hpp                 \
-                  minsn_template.hpp msynth_parser.cpp msynth_parser.hpp    \
-                  smt_convert.hpp z3++_no_warn.h
+                  consts.hpp linear_exprs.hpp minsn_template.hpp            \
+                  msynth_parser.cpp msynth_parser.hpp smt_convert.hpp       \
+                  z3++_no_warn.h
 $(F)optimizer$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp            \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
@@ -124,14 +122,13 @@ $(F)optimizer$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp            \
                   $(I)segment.hpp $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp   \
                   bitwise_expr_lookup_tbl.hpp consts.hpp equiv_class.hpp    \
                   heuristics.hpp lin_conj_exprs.hpp linear_exprs.hpp        \
-                  mcode_emu.hpp minsn_template.hpp msynth_parser.hpp        \
-                  nonlin_expr.hpp optimizer.cpp optimizer.hpp               \
-                  simp_lin_conj_exprs.hpp smt_convert.hpp z3++_no_warn.h
+                  minsn_template.hpp msynth_parser.hpp nonlin_expr.hpp      \
+                  optimizer.cpp optimizer.hpp simp_lin_conj_exprs.hpp       \
+                  smt_convert.hpp z3++_no_warn.h
 $(F)smt_convert$(O): $(I)bitrange.hpp $(I)bytes.hpp $(I)config.hpp          \
                   $(I)fpro.h $(I)funcs.hpp $(I)gdl.hpp $(I)hexrays.hpp      \
                   $(I)ida.hpp $(I)idp.hpp $(I)ieee.h $(I)kernwin.hpp        \
                   $(I)lines.hpp $(I)llong.hpp $(I)loader.hpp $(I)nalt.hpp   \
                   $(I)name.hpp $(I)netnode.hpp $(I)pro.h $(I)range.hpp      \
                   $(I)segment.hpp $(I)typeinf.hpp $(I)ua.hpp $(I)xref.hpp   \
-                  mcode_emu.hpp smt_convert.cpp smt_convert.hpp             \
-                  z3++_no_warn.h
+                  smt_convert.cpp smt_convert.hpp z3++_no_warn.h

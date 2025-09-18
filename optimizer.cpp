@@ -35,17 +35,17 @@ static bool check_and_substitute(
   bool ok = false;
   int original_score = score_complexity(*insn);
   int candidate_score = score_complexity(*cand_insn);
-  msg("Testing candidate %s\n", cand_insn->dstr());
+  msg("goomba: testing candidate: %s\n", cand_insn->dstr());
   if ( candidate_score > original_score )
   {
-    msg("Candidate (%d) is not simpler than original (%d), skipping\n", candidate_score, original_score);
+    msg("goomba: candidate (%d) is not simpler than original (%d), skipping\n", candidate_score, original_score);
   }
   else
   {
     z3_converter_t converter;
     if ( probably_equivalent(*insn, *cand_insn) )
     {
-      msg("Instruction is probably equivalent to candidate\n");
+      msg("goomba: instruction is probably equivalent to candidate\n");
       if ( skip_proofs() || z3_timeout == 0 )
       {
         set_cmt(insn->ea, "goomba: z3 proof skipped, simplification assumed correct");
@@ -55,11 +55,23 @@ static bool check_and_substitute(
       {
         z3::expr lge = converter.minsn_to_expr(*cand_insn);
         z3::expr ie = converter.minsn_to_expr(*insn);
+        // msg("lge: %s\n", lge.to_string().c_str());
+        // msg("ie: %s\n", ie.to_string().c_str());
         z3::solver s(converter.context);
         s.set("timeout", z3_timeout);
         s.add(lge != ie);
         z3::check_result res = s.check();
-        msg("SMT check result: %d\n", res);
+        msg("goomba: SMT check result: %d\n", res);
+        if ( res == z3::check_result::sat )
+        {
+          msg("Satisfiable. Counterexample: \n");
+          z3::model m = s.get_model();
+          for ( unsigned i = 0; i < m.size(); i++ )
+          {
+            z3::func_decl v = m[i];
+            msg("%s = %s\n", v.name().str().c_str(), m.get_const_interp(v).to_string().c_str());
+          }
+        }
 
         if ( res == z3::check_result::unsat )
         {
@@ -73,8 +85,8 @@ static bool check_and_substitute(
           // when running the testable build, do not append comments about z3 timeouts
           if ( add_cmt )
           {
-            qstring tmp;
-            if ( qgetenv("IDA_TEST_NAME", &tmp) )
+            qstring dummy;
+            if ( qgetenv("IDA_TEST_NAME", &dummy) )
               add_cmt = false;
           }
 #endif
@@ -86,13 +98,15 @@ static bool check_and_substitute(
     }
     else
     {
-      msg("Candidate not equivalent, skipping\n");
+      msg("goomba: candidate not equivalent, skipping\n");
     }
   }
 
   if ( ok )
+  {
+    msg("goomba: SUCCESS: %s\n", cand_insn->dstr());
     substitute(insn, cand_insn);
-
+  }
   return ok;
 }
 
@@ -102,109 +116,124 @@ bool optimizer_t::optimize_insn_recurse(minsn_t *insn)
   if ( optimize_insn(insn) )
     return true;
 
-  bool result = false;
+  // if unable to optimize insn, try to optimize all of its mops
+  struct optimizer_visitor_t : public mop_visitor_t
+  {
+    optimizer_t *opt;
+    optimizer_visitor_t(optimizer_t *o) : opt(o) {}
+    bool result = false;
 
-  if ( insn->l.is_insn() )
-    result |= optimize_insn_recurse(insn->l.d);
+    int idaapi visit_mop(mop_t *op, const tinfo_t *, bool)
+    {
+      if ( op->is_insn() )
+      {
+        result |= opt->optimize_insn(op->d);
+      }
+      return 0;
+    }
+  };
 
-  if ( insn->r.is_insn() )
-    result |= optimize_insn_recurse(insn->r.d);
+  optimizer_visitor_t opt_mop(this);
+  insn->for_all_ops(opt_mop);
 
-  return result;
+  return opt_mop.result;
+}
+
+//--------------------------------------------------------------------------
+static void add_candidate(minsnptrs_t *out, minsn_t *cand, const char *source)
+{
+  cand->optimize_solo();
+  msg("goomba: %s guess: %s\n", source, cand->dstr());
+  out->push_back(cand);
 }
 
 //--------------------------------------------------------------------------
 bool optimizer_t::optimize_insn(minsn_t *insn)
 {
-  bool success = false;
-  auto start_time = std::chrono::high_resolution_clock::now();
-
   if ( insn->has_side_effects(true) )
   {
-//    msg("Instruction has side effects, skipping\n");
+    // msg("goomba: instruction has side effects, skipping\n");
+    return false;
   }
-  else
+
+  if ( !is_mba(*insn) )
+    return false; // not an MBA instruction
+  msg("goomba: found an MBA instruction %s\n", insn->dstr());
+
+  bool success = false;
+  auto start_time = std::chrono::high_resolution_clock::now();
+  minsnptrs_t candidates;
+  try
   {
-    if ( is_mba(*insn) )
+    auto equiv_class_start = std::chrono::high_resolution_clock::now();
+    if ( equiv_classes != nullptr )
+    { // Find candidates from the oracle file
+      minsnptrs_t tmp;
+      equiv_classes->find_candidates(&tmp, *insn);
+      for ( minsn_t *i : tmp )
+        add_candidate(&candidates, i, "Oracle");
+    }
+    auto equiv_class_end = std::chrono::high_resolution_clock::now();
+
+    // Produce one candidate using naive linear guess
+    auto linear_start = equiv_class_end;
+    linear_expr_t linear_guess(*insn);
+    add_candidate(&candidates, linear_guess.to_minsn(insn->ea), "Linear");
+    auto linear_end = std::chrono::high_resolution_clock::now();
+
+    // Produce one candidate using SiMBA's algorithm
+    auto lin_conj_start = linear_end;
+    lin_conj_expr_t lin_conj_guess(*insn);      // MBA Solver's simplification
+    simp_lin_conj_expr_t simp_lin_conj_expr(lin_conj_guess);      // Simba's simplification
+    add_candidate(&candidates, simp_lin_conj_expr.to_minsn(insn->ea), "Simplified lin conj");
+    auto lin_conj_end = std::chrono::high_resolution_clock::now();
+
+    // Produce one candidate using non-linear MBA simplification
+    auto nonlin_start = lin_conj_end;
+    nonlin_expr_t nonlin_guess(*insn);
+    if ( nonlin_guess.success() )
     {
-      msg("Found MBA instruction %s\n", insn->dstr());
+      add_candidate(&candidates, nonlin_guess.to_minsn(insn->ea), "Non-linear");
+    }
+    auto nonlin_end = std::chrono::high_resolution_clock::now();
 
-      minsnptrs_t candidates;
-      try
+    // Verify the candidates. Return the simplest one that passed verification.
+    std::sort(candidates.begin(), candidates.end(), minsn_complexity_cmptr_t());
+    for ( minsn_t *cand : candidates )
+    {
+      if ( check_and_substitute(insn, cand, z3_timeout, z3_assume_timeouts_correct) )
       {
-        auto equiv_class_start = std::chrono::high_resolution_clock::now();
-        if ( equiv_classes != nullptr )
-          equiv_classes->find_candidates(&candidates, *insn); // Find candidates from the oracle file
-        auto equiv_class_end = std::chrono::high_resolution_clock::now();
-
-        // Produce one candidate using naive linear guess
-        auto linear_start = equiv_class_end;
-        linear_expr_t linear_guess(*insn);
-//        msg("Linear guess %s\n", linear_guess.dstr());
-        candidates.push_back(linear_guess.to_minsn(insn->ea));
-        auto linear_end = std::chrono::high_resolution_clock::now();
-
-        // Produce one candidate using SiMBA's algorithm
-        auto lin_conj_start = linear_end;
-        lin_conj_expr_t lin_conj_guess(*insn);      // MBA Solver's simplification
-        simp_lin_conj_expr_t simp_lin_conj_expr_t(lin_conj_guess);      // Simba's simplification
-//        msg("Simplified lin conj guess %s\n", simp_lin_conj_expr_t.dstr());
-        candidates.push_back(simp_lin_conj_expr_t.to_minsn(insn->ea));
-        auto lin_conj_end = std::chrono::high_resolution_clock::now();
-
-        // Non-linear MBA optimization
-        nonlin_expr_t nonlin_guess(*insn);
-        if ( nonlin_guess.success() )
+        if ( qgetenv("VD_MBA_LOG_PERF") )
         {
-          minsn_t *nonlin_cand = nonlin_guess.to_minsn(insn->ea);
-          candidates.push_back(nonlin_cand);
+          int nvars = get_input_mops(*insn).size();
+          msg("goomba: Equiv class time: %d %" FMT_64 "d us\n", nvars,
+            std::chrono::duration_cast<std::chrono::microseconds>(equiv_class_end - equiv_class_start).count());
+          msg("goomba: Linear time: %d %" FMT_64 "d us\n", nvars,
+            std::chrono::duration_cast<std::chrono::microseconds>(linear_end - linear_start).count());
+          msg("goomba: Lin conj time: %d %" FMT_64 "d us\n", nvars,
+            std::chrono::duration_cast<std::chrono::microseconds>(lin_conj_end - lin_conj_start).count());
+          msg("goomba: Non-linear time: %d %" FMT_64 "d us\n", nvars,
+            std::chrono::duration_cast<std::chrono::microseconds>(nonlin_end - nonlin_start).count());
         }
-
-        // Optimize candidates before sorting them by complexity
-        for ( minsn_t *cand : candidates )
-          cand->optimize_solo();
-
-        std::sort(candidates.begin(), candidates.end(), minsn_complexity_cmptr_t());
-//        msg("total %d candidates:\n", candidates.size());
-//        for ( minsn_t *cand : candidates )
-//          msg("  %s:\n", cand->dstr());
-
-        // Verify the candidates. Return the simplest one that passed verification.
-        for ( minsn_t *cand : candidates )
-        {
-          if ( check_and_substitute(insn, cand, z3_timeout, z3_assume_timeouts_correct) )
-          {
-            if ( qgetenv("VD_MBA_LOG_PERF") )
-            {
-              int nvars = get_input_mops(*insn).size();
-              msg("Equiv class time: %d %" FMT_64 "d us\n", nvars,
-                std::chrono::duration_cast<std::chrono::microseconds>(equiv_class_end - equiv_class_start).count());
-              msg("Linear time: %d %" FMT_64 "d us\n", nvars,
-                std::chrono::duration_cast<std::chrono::microseconds>(linear_end - linear_start).count());
-              msg("Lin conj time: %d %" FMT_64 "d us\n", nvars,
-                std::chrono::duration_cast<std::chrono::microseconds>(lin_conj_end - lin_conj_start).count());
-            }
-            success = true;
-            break;
-          }
-        }
+        success = true;
+        break;
       }
-      catch ( const char *&e )
-      {
-        msg("err: %s\n", e);
-      }
-      // delete all candidates
-      for ( minsn_t *ins : candidates )
-        delete ins;
     }
   }
+  catch ( const vd_failure_t &vf )
+  {
+    msg("goomba: %s\n", vf.hf.str.c_str());
+  }
+
+  // delete all candidates
+  for ( minsn_t *cand : candidates )
+    delete cand;
 
   if ( success )
   {
     auto end_time = std::chrono::high_resolution_clock::now();
-    msg("Time taken: %" FMT_64 "d us\n",
+    msg("goomba: Time taken: %" FMT_64 "d us\n",
       std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count());
   }
-
   return success;
 }
