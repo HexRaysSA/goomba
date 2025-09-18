@@ -45,3 +45,6 @@ On macOS:
  * `/path/to/idasdk_pro82/bin/libz3.*` -> `/path/to/ida82/ida.app/Contents/MacOS/`
  * `/path/to/idasdk_pro82/bin/libz3.*` -> `/path/to/ida82/ida64.app/Contents/MacOS/`
 
+## Building with CMake
+
+For convenience, it is possible to build `gooMBA` with CMake. Just grab the proper CMake build scripts from [here](https://github.com/0xeb/ida-cmake/tree/master/plugins/3rd_party/goomba).
