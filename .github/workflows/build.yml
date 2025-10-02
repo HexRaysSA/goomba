@@ -153,12 +153,14 @@ jobs:
           make __EA64__=1
 
       - name: Collect artifacts
+        shell: bash
         run: |
           mkdir -p artifacts
           cp ida-sdk/bin/plugins/goomba* artifacts/
           cp ida-sdk/bin/cfg/goomba.cfg artifacts/
           cp ida-sdk/bin/libz3.* artifacts/
-  
+          rm -f artifacts/goomba.ilk
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
