@@ -165,3 +165,22 @@ jobs:
           name: gooMBA-ida${{ matrix.environment.ida_version }}-${{ matrix.environment.os_name }}-ea64
           path: artifacts/*
           if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create release and upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-artifacts/**/*
+          fail_on_unmatched_files: true
