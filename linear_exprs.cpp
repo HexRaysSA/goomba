@@ -62,7 +62,11 @@ linear_expr_t::linear_expr_t(const minsn_t &insn) // creates a linear expression
         sext.insert(mop);
     }
 
-    coeffs.insert( { mop, emu.minsn_value(insn) - const_term } );
+    // Keep the coefficient measured with the 1-valued probe. The emulator is
+    // deliberately changed to -1 above when checking whether the operand is
+    // sign-extended; re-reading it here would save the probe value (0xff for
+    // an 8-bit operand) instead of the actual linear coefficient (usually 1).
+    coeffs.insert( { mop, coeff } );
     p.second = intval64_t(0, mop.size);
   }
 }
